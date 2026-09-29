@@ -73,7 +73,7 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Чистый симметричный сплайн)
+                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Анатомический Безье)
                     let sP = (p - 0.3) / 0.58; 
                     let totalH = 18 + (sP * 72); 
                     let topY = 320 - totalH;
@@ -81,21 +81,26 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let curNeck = 30 - (30 - critNeck) * (sP * sP);
                     let bulbR = curNeck + (36 - curNeck) * Math.sin(sP * Math.PI);
                     
+                    // Левая и правая границы пузатой части капли
                     let xLeftB = 200 - bulbR;
                     let xRightB = 200 + bulbR;
+                    
+                    // Левая и правая границы узкой шейки капли
                     let xLeftN = 200 - curNeck;
                     let xRightN = 200 + curNeck;
                     
-                    // Высота контрольных точек для управления "пухлостью" мешочка
-                    let yCtrlLower = 310;
-                    let yCtrlUpper = topY + (totalH * 0.2);
+                    // Высоты контрольных точек
+                    let yNeck = 320 - (totalH * 0.25); // Позиция шейки (чуть выше капилляра)
+                    let yBulb = topY + (totalH * 0.35); // Позиция пузатой части капли
                     
-                    // ВСЕГО ДВЕ КРИВЫЕ: одна вверх, одна вниз. Полная симметрия и плавность без изломов
+                    // ЧЕТЫРЕ КРИВЫЕ: Сначала сужение к шейке, затем расширение к пузу, закругление макушки и симметричный спуск
                     let d = `M 170,320 
-                             C 170,${{yCtrlLower}} ${{xLeftB}},${{yCtrlUpper}} 200,${{topY}} 
-                             C ${{xRightB}},${{yCtrlUpper}} 230,${{yCtrlLower}} 230,320 Z`;
+                             Q 170,${{yNeck}} ${{xLeftN}},${{yNeck}} 
+                             C ${{xLeftN}},${{yNeck}} ${{xLeftB}},${{yBulb}} ${{xLeftB}},${{topY + (totalH * 0.5)}} 
+                             A ${{bulbR}},${{bulbR}} 0 0,1 ${{xRightB}},${{topY + (totalH * 0.5)}} 
+                             C ${{xRightB}},${{yBulb}} ${{xRightN}},${{yNeck}} ${{xRightN}},${{yNeck}} 
+                             Q 230,${{yNeck}} 230,320 Z`;
                     dropPath.setAttribute('d', d);
-
 
                     
                 }} else if (p <= 0.94) {{
