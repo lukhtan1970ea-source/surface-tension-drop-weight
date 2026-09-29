@@ -73,7 +73,7 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Гладкий сплайн)
+                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Полигональный расчет)
                     let sP = (p - 0.3) / 0.58; 
                     let totalH = 18 + (sP * 72); 
                     let topY = 320 - totalH;
@@ -81,24 +81,56 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let curNeck = 30 - (30 - critNeck) * (sP * sP);
                     let bulbR = curNeck + (36 - curNeck) * Math.sin(sP * Math.PI);
                     
-                    let xLeftB = 200 - bulbR;
-                    let xRightB = 200 + bulbR;
-                    let xLeftN = 200 - curNeck;
-                    let xRightN = 200 + curNeck;
+                    // Строим контур по точкам (снизу вверх по левой стороне, и сверху вниз по правой)
+                    let points = [];
+                    let steps = 40;
                     
-                    // Расчет высот для контрольных точек натяжения жидкости
-                    let yCtrl1 = 320 - (totalH * 0.15); // Шейка чуть выше капилляра
-                    let yCtrl2 = topY + (totalH * 0.3);  // Пузо капли
+                    // Левая сторона капли (снизу вверх)
+                    for (let i = 0; i <= steps; i++) {{
+                        let t = i / steps; // параметр от 0 до 1
+                        let y = 320 - (t * totalH);
+                        
+                        let r = 0;
+                        if (t < 0.25) {{
+                            // Плавный переход от края капилляра (30) к самой узкой шейке (curNeck)
+                            let k = t / 0.25;
+                            r = 30 - (30 - curNeck) * Math.sin(k * Math.PI / 2);
+                        }} else {{
+                            // Плавное расширение от шейки к пузу и сужение к макушке
+                            let k = (t - 0.25) / 0.75;
+                            // Базовый профиль капли по синусоиде
+                            r = curNeck + (bulbR - curNeck) * Math.sin(k * Math.PI);
+                            // Скругление к макушке
+                            if (k > 0.7) {{
+                                let edge = (k - 0.7) / 0.3;
+                                r *= Math.cos(edge * Math.PI / 2);
+                            }}
+                        }}
+                        points.push((200 - r) + "," + y);
+                    }}
                     
-                    // Идеально гладкий жидкий контур через M -> C -> S -> S -> S -> Z
-                    // Никаких изломов: каждая последующая точка плавно вытекает из предыдущей
-                    let d = `M 170,320 
-                             C 170,${{yCtrl1}} ${{xLeftN}},${{yCtrl1}} ${{xLeftN}},${{310}} 
-                             C ${{xLeftN}},290 ${{xLeftB}},${{yCtrl2}} ${{xLeftB}},${{topY + (totalH * 0.5)}} 
-                             S 190,${{topY}} 200,${{topY}} 
-                             S ${{xRightB}},${{topY + (totalH * 0.5)}} ${{xRightB}},${{topY + (totalH * 0.5)}}
-                             C ${{xRightB}},${{yCtrl2}} ${{xRightN}},290 ${{xRightN}},310
-                             C ${{xRightN}},${{yCtrl1}} 230,${{yCtrl1}} 230,320 Z`;
+                    // Правая сторона капли (зеркально сверху вниз)
+                    for (let i = steps; i >= 0; i--) {{
+                        let t = i / steps;
+                        let y = 320 - (t * totalH);
+                        
+                        let r = 0;
+                        if (t < 0.25) {{
+                            let k = t / 0.25;
+                            r = 30 - (30 - curNeck) * Math.sin(k * Math.PI / 2);
+                        }} else {{
+                            let k = (t - 0.25) / 0.75;
+                            r = curNeck + (bulbR - curNeck) * Math.sin(k * Math.PI);
+                            if (k > 0.7) {{
+                                let edge = (k - 0.7) / 0.3;
+                                r *= Math.cos(edge * Math.PI / 2);
+                            }}
+                        }}
+                        points.push((200 + r) + "," + y);
+                    }}
+                    
+                    // Собираем точки в идеальный многоугольник SVG
+                    let d = "M 170,320 L " + points.join(" L ") + " Z";
                     dropPath.setAttribute('d', d);
 
                     
