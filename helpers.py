@@ -73,7 +73,7 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Витягування в мешочок з формуванням шийки. Без збоїв синтаксису.
+                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки
                     let sP = (p - 0.3) / 0.58; 
                     let totalH = 18 + (sP * 72); 
                     let topY = 320 - totalH;
@@ -85,11 +85,15 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let xRightB = 200 + bulbR;
                     let xLeftN = 200 - curNeck;
                     let xRightN = 200 + curNeck;
-                    let yControl = topY + (totalH * 0.2);
                     
-                    // Абсолютно математично чистий та стабільний шлях
-                    let d = `M 170,320 C 170,310 ${{xLeftN}},300 ${{xLeftB}},${{yControl}} A ${{bulbR}},${{bulbR * 1.1}} 0 0,1 ${{xRightB}},${{yControl}} C ${{xRightN}},300 230,310 230,320 Z`;
+                    // Контрольные точки по Y для плавного изгиба мешочка
+                    let yCtrl1 = 310;
+                    let yCtrl2 = topY + (totalH * 0.3);
+                    
+                    // Идеально отформатированный путь SVG с правильными запятыми между X и Y
+                    let d = `M 170,320 C 170,${{yCtrl1}} ${{xLeftN}},300 ${{xLeftB}},${{yCtrl2}} A ${{bulbR}},${{bulbR * 1.1}} 0 0,1 ${{xRightB}},${{yCtrl2}} C ${{xRightN}},300 230,${{yCtrl1}} 230,320 Z`;
                     dropPath.setAttribute('d', d);
+
                     
                 }} else if (p <= 0.94) {{
                     // ФАЗА 3: Відрив та релаксація в сферу
