@@ -1,25 +1,24 @@
 import streamlit as st
 import numpy as np
-import time
-from helpers import LIQUIDS, get_physical_properties, draw_scene
+from helpers import LIQUIDS, get_physical_properties, generate_svg_animation
 
-# Настройка страницы
+# Базовая настройка темы приложения
 st.set_page_config(page_title="Stalagmometer Pro Sim", layout="wide")
 
 # ==========================================
-# 1. ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ (SESSION STATE)
+# 1. ИНИЦИАЛИЗАЦИЯ И СБРОС СОСТОЯНИЯ
 # ==========================================
 if "tare_weight" not in st.session_state:
     st.session_state.tare_weight = round(25.123 + np.random.uniform(-0.5, 0.5), 3)
-if "drops_counted" not in st.session_state:
-    st.session_state.drops_counted = 0
-if "current_liquid" not in st.session_state:
-    st.session_state.current_liquid = list(LIQUIDS.keys())[0]
-if "current_temp" not in st.session_state:
-    st.session_state.current_temp = 20.0
+if "experiment_triggered" not in st.session_state:
+    st.session_state.experiment_triggered = False
+if "last_liquid" not in st.session_state:
+    st.session_state.last_liquid = ""
+if "last_temp" not in st.session_state:
+    st.session_state.last_temp = 20.0
 
 # ==========================================
-# 2. ИНТЕРФЕЙС И УПРАВЛЕНИЕ
+# 2. БОКОВАЯ ПАНЕЛЬ УПРАВЛЕНИЯ
 # ==========================================
 st.title("🔬 Лабораторная работа: Определение поверхностного натяжения методом взвешивания капель")
 st.markdown("---")
@@ -29,88 +28,64 @@ selected_liquid = st.sidebar.selectbox("Выберите исследуемую 
 temperature = st.sidebar.slider("Температура жидкости (°C)", 10.0, 80.0, 20.0, 0.5)
 target_drops = st.sidebar.number_input("Сколько капель отсчитать в стакан?", min_value=5, max_value=50, value=10, step=5)
 
-# Сброс при смене параметров
-if selected_liquid != st.session_state.current_liquid or temperature != st.session_state.current_temp:
-    st.session_state.current_liquid = selected_liquid
-    st.session_state.current_temp = temperature
-    st.session_state.drops_counted = 0
+# Автоматический сброс весов при изменении настроек опыта
+if selected_liquid != st.session_state.last_liquid or temperature != st.session_state.last_temp:
+    st.session_state.last_liquid = selected_liquid
+    st.session_state.last_temp = temperature
+    st.session_state.experiment_triggered = False
     st.session_state.tare_weight = round(25.123 + np.random.uniform(-0.5, 0.5), 3)
 
+# Расчет физических констант и массы для весов
 sigma_true, rho_true = get_physical_properties(selected_liquid, temperature)
-
-# Физические константы
 R_capillary = 0.0015  
 g = 9.81
 mass_one_drop_true = (2 * np.pi * R_capillary * sigma_true) / g
 
+# Индивидуальный шум для весов (чтобы данные были реалистичными)
 np.random.seed(int(temperature * 7))
 actual_mass_one_drop = max(1e-6, mass_one_drop_true + np.random.normal(0, mass_one_drop_true * 0.005))
 
-# --- Управление микроскопом ---
 st.sidebar.header("🔍 Визир микроскопа")
-mic_x = st.sidebar.slider("Смещение визира по горизонтали (X)", -2.0, 2.0, 0.0, 0.05)
-mic_y = st.sidebar.slider("Смещение визира по вертикали (Y)", -8.0, 2.0, 0.0, 0.1)
+mic_x = st.sidebar.slider("Смещение визира по X (мм)", -2.0, 2.0, 0.0, 0.05)
+mic_y = st.sidebar.slider("Смещение визира по Y (мм)", -8.0, 2.0, 0.0, 0.1)
 
 # ==========================================
-# 3. СТЕНД ЭКСПЕРИМЕНТА
+# 3. ОСНОВНОЙ РАБОЧИЙ СТЕНД
 # ==========================================
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1.2, 1.0])
+
+if st.sidebar.button("🚀 Запустить дозатор жидкости", use_container_width=True):
+    st.session_state.experiment_triggered = True
+    js_trigger = "true"
+else:
+    js_trigger = "false"
+
+# Генерация HTML кода анимации из helpers.py
+svg_html = generate_svg_animation(target_drops, sigma_true, mic_x, mic_y, js_trigger)
 
 with col1:
-    st.subheader("🔬 Поле зрения микроскопа")
-    plot_placeholder = st.empty()
-    # Первичный вывод сцены (фиксированная ширина, статический режим)
-    fig_init = draw_scene("growing", 0.0, 0.0, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
-    plot_placeholder.plotly_chart(fig_init, use_container_width=False, config={'staticPlot': True})
+    st.subheader("👁️ Поле зрения визира")
+    st.components.v1.html(svg_html, height=540, scrolling=False)
+    st.caption("Шкала микроскопа и движение капель теперь отрисовываются на стороне браузера и работают идеально плавно.")
 
 with col2:
-    st.subheader("📊 Управление и Весы")
+    st.subheader("📊 Измерительный модуль")
     
-    if st.button("🚀 Запустить дозатор жидкости", use_container_width=True):
-        st.session_state.drops_counted = 0
-        
-        for d in range(target_drops):
-            # 1. Фаза роста
-            steps_growth = 15  # Немного уменьшим шаги для увеличения скорости и плавности
-            for step in range(steps_growth):
-                progress = step / float(steps_growth - 1)
-                fig = draw_scene("growing", progress, 0.0, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
-                plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True})
-                time.sleep(0.03)
-            
-            # Пауза перед отрывом
-            time.sleep(0.15)
-            
-            # 2. Фаза падения капли в стакан
-            y_start = -4.5
-            y_end = -9.5
-            steps_fall = 5
-            for step in range(steps_fall):
-                pos_y = y_start + (y_end - y_start) * (step / float(steps_fall - 1))
-                fig = draw_scene("falling", 1.0, pos_y, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
-                plot_placeholder.plotly_chart(fig, use_container_width=False, config={'staticPlot': True})
-                time.sleep(0.015)
-                
-            st.session_state.drops_counted += 1
-            
-        # Финальное обновление весов и картинки
-        fig_final = draw_scene("growing", 0.0, 0.0, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
-        plot_placeholder.plotly_chart(fig_final, use_container_width=False, config={'staticPlot': True})
-        st.balloons()
-
-
-
-    # Измерительный блок весов
-    st.markdown("### ⚖️ Электронные аналитические весы")
-    total_drops_mass_g = (st.session_state.drops_counted * actual_mass_one_drop) * 1000 
+    # Расчет текущих показателей аналитических весов
+    display_drops = target_drops if st.session_state.experiment_triggered else 0
+    total_drops_mass_g = (display_drops * actual_mass_one_drop) * 1000 
     current_weight = st.session_state.tare_weight + total_drops_mass_g
     
     st.metric(label="Масса сухого стакана ($m_0$)", value=f"{st.session_state.tare_weight:.3f} г")
-    st.metric(label="Текущая масса стакана с жидкостью ($m_1$)", value=f"{current_weight:.3f} г")
-    st.success(f"**Счётчик капель:** {st.session_state.drops_counted} / {target_drops} шт.")
+    st.metric(label="Итоговая масса стакана с жидкостью ($m_1$)", value=f"{current_weight:.3f} г")
+    
+    if st.session_state.experiment_triggered:
+        st.success(f"✅ Успешно отсчитано капель: {display_drops} шт.")
+    else:
+        st.info("💡 Нажмите кнопку на боковой панели, чтобы начать прокапывание.")
 
 # ==========================================
-# 4. ЖУРНАЛ ДАННЫХ
+# 4. ТАБЛИЦА РЕЗУЛЬТАТОВ ДЛЯ ОТЧЕТА
 # ==========================================
 st.markdown("---")
 st.subheader("📋 Данные текущего опыта")
@@ -120,18 +95,17 @@ results_data = {
         "Исследуемая рабочая жидкость",
         "Установленная температура опыта (T)",
         "Счётчик сброшенных капель (N)",
-        "Масса пустого бюкса (m₀)",
-        "Масса бюкса с каплями (m₁)",
+        "Масса пустого стакана (m₀)",
+        "Масса стакана с каплями (m₁)",
         "Масса чистой фракции капель (Δm)"
     ],
     "Значение": [
         selected_liquid,
         f"{temperature} °C",
-        f"{st.session_state.drops_counted} шт.",
+        f"{display_drops} шт.",
         f"{st.session_state.tare_weight:.3f} г",
         f"{current_weight:.3f} г",
         f"{(current_weight - st.session_state.tare_weight):.3f} г"
     ]
 }
 st.table(results_data)
-
