@@ -76,9 +76,14 @@ def draw_scene(phase, growth_progress, drop_y_pos, sigma_true, drops_counted, mi
         fig.add_shape(type="line", x0=mic_x + tick, y0=mic_y - 0.1, x1=mic_x + tick, y1=mic_y + 0.1, line=dict(color="red", width=1))
 
     fig.update_layout(
-        xaxis=dict(range=[-4, 4], title="Шкала X (мм)", showgrid=False, zeroline=False),
-        yaxis=dict(range=[-10, 2], title="Шкала Y (мм)", showgrid=False, zeroline=False),
-        width=500, height=600, showlegend=False, template="plotly_dark", margin=dict(l=10, r=10, t=10, b=10)
+        xaxis=dict(range=[-4, 4], title="Шкала X (мм)", showgrid=False, zeroline=False, fixedrange=True),
+        yaxis=dict(range=[-10, 2], title="Шкала Y (мм)", showgrid=False, zeroline=False, fixedrange=True),
+        width=480, height=550,
+        showlegend=False,
+        template="plotly_dark",
+        margin=dict(l=5, r=5, t=5, b=5),
+        autosize=False  # Запрещаем Plotly дергать размеры контейнера
     )
     return fig
+
 
