@@ -2,11 +2,11 @@ import streamlit as st
 import numpy as np
 from helpers import LIQUIDS, get_physical_properties, generate_microscope_svg, generate_stand_svg
 
-# Налаштування сторінки
+# Базовая настройка страницы
 st.set_page_config(page_title="Stalagmometer Pro Sim", layout="wide")
 
 # ==========================================
-# 1. ІНІЦІАЛІЗАЦІЯ ТА СКИДАННЯ СТАНУ
+# 1. ИНИЦИАЛИЗАЦИЯ И СБРОС СОСТОЯНИЯ
 # ==========================================
 if "tare_weight" not in st.session_state:
     st.session_state.tare_weight = round(25.123 + np.random.uniform(-0.5, 0.5), 3)
@@ -18,7 +18,7 @@ if "last_temp" not in st.session_state:
     st.session_state.last_temp = 20.0
 
 # ==========================================
-# 2. БОКОВА ПАНЕЛЬ КЕРУВАННЯ
+# 2. ЗАГОЛОВОК И БОКОВАЯ ПАНЕЛЬ
 # ==========================================
 st.title("🔬 Лабораторна робота: Визначення коефіцієнта поверхневого натягу методом зважування крапель")
 st.markdown("---")
@@ -32,24 +32,24 @@ def reset_stand_state():
     st.session_state.experiment_triggered = False
     st.session_state.tare_weight = round(25.123 + np.random.uniform(-0.5, 0.5), 3)
 
-# Автоматичний скид при зміні рідини або температури
+# Сброс при смене параметров опыта
 if selected_liquid != st.session_state.last_liquid or temperature != st.session_state.last_temp:
     st.session_state.last_liquid = selected_liquid
     st.session_state.last_temp = temperature
     reset_stand_state()
 
-# Розрахунок фізики
+# Расчет физических параметров
 sigma_true, rho_true = get_physical_properties(selected_liquid, temperature)
 R_capillary = 0.0015  
 g = 9.81
 mass_one_drop_true = (2 * np.pi * R_capillary * sigma_true) / g
 
-# Додавання індивідуального шуму для ваг
+# Индивидуальный "живой" шум для показаний весов
 np.random.seed(int(temperature * 7))
 actual_mass_one_drop = max(1e-6, mass_one_drop_true + np.random.normal(0, mass_one_drop_true * 0.005))
 
 # ==========================================
-# 3. ВЕРХНЯ ПАНЕЛЬ УПРАВЛІННЯ СТЕНДОМ
+# 3. ВЕРХНЯЯ ПАНЕЛЬ УПРАВЛЕНИЯ И СБРОСА
 # ==========================================
 ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([1.5, 1.5, 1.0])
 
@@ -62,10 +62,6 @@ with ctrl_col2:
         reset_stand_state()
         st.rerun()
 
-# Стан запуску для передачі в SVG
-is_running_js = "true" if st.session_state.experiment_triggered else "false"
-
-# Маса для відображення
 display_drops = target_drops if st.session_state.experiment_triggered else 0
 total_drops_mass_g = (display_drops * actual_mass_one_drop) * 1000 
 current_weight = st.session_state.tare_weight + total_drops_mass_g
@@ -79,7 +75,7 @@ with ctrl_col3:
 st.markdown(" ")
 
 # ==========================================
-# 4. ГОЛОВНІ ВКЛАДКИ
+# 4. РАБОЧИЕ ВКЛАДКИ
 # ==========================================
 tab1, tab2 = st.tabs(["🔍 Окуляр мікроскопа (Вимірювання шийки)", "⚖️ Лабораторний стенд (Зважування крапель)"])
 
@@ -90,10 +86,10 @@ with tab1:
         st.markdown("### 🎛️ Налаштування візира мікроскопа")
         mic_x = st.slider("Зсув шкали по горизонталі X (мм)", -2.0, 2.0, 0.0, 0.05)
         mic_y = st.slider("Зсув шкали по вертикалі Y (мм)", -4.0, 4.0, 0.0, 0.05)
-        st.info("🔬 **Порада для студентів:** Сумістіть вертикальну лінію шкали з бічною межею шийки краплі в момент її найбільшого розтягування (прямо перед відривом).")
+        st.info("🔬 **Порада для студентів:** Сумістіть вертикальну лінію червоної шкали з бічною межею шийки краплі безпосередньо в момент її найбільшого витягування (перед самим відривом).")
         
     with col_mic_left:
-        # Виклик анатомічно точного перевернутого мікроскопа
+        # Вызов перевернутого микроскопа с четырехфазной каплей
         mic_svg = generate_microscope_svg(sigma_true, mic_x, mic_y)
         st.components.v1.html(mic_svg, height=440, scrolling=False)
 
@@ -110,12 +106,12 @@ with tab2:
         st.info(f"**Маса чистої фракції крапель (Δm):** {max(0.0, current_weight - st.session_state.tare_weight):.3f} г")
             
     with col_st_left:
-        # Виклик нормальної каплевидної анімації стенду
+        # Вызов нормального стенда с капающей идеальной сферой
         stand_svg = generate_stand_svg(target_drops, sigma_true, st.session_state.experiment_triggered)
         st.components.v1.html(stand_svg, height=480, scrolling=False)
 
 # ==========================================
-# 5. СУКУПНИЙ ЖУРНАЛ ДАНИХ
+# 5. СВОДНЫЙ ЖУРНАЛ ИЗМЕРЕНИЙ
 # ==========================================
 st.markdown("---")
 st.subheader("📋 Журнал вимірювань (Вихідні дані для звіту)")
