@@ -15,171 +15,97 @@ def get_physical_properties(liquid_name, temp_c):
     return max(0.005, sigma), max(500.0, rho)
 
 def generate_microscope_svg(sigma_true, mic_x, mic_y):
-    # Масштаб: 1 мм = 50 пикселей. Центр окуляра — (200, 200)
+    # Координаты визира (1 мм = 50 пикселей)
     svg_mic_x = 200 + (mic_x * 50)
     svg_mic_y = 200 - (mic_y * 50)
     
-    # Расчет радиуса шейки (от 15 до 30 пикселей)
-    neck_radius = max(15.0, min(30.0, (sigma_true * 1000) * 0.4))
+    # Расчет критической ширины шейки (в пикселях)
+    w = max(12.0, min(28.0, (sigma_true * 1000) * 0.38))
+    wb = w * 1.5 # Ширина самой капли
     
-    html_code = f"""
-    <div style="background-color: #111; padding: 15px; border-radius: 8px; width: 420px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-        <svg width="400" height="400" viewBox="0 0 400 400" style="background: #050a05; border: 3px solid #333; border-radius: 50%;">
-            <!-- Перевернутый капилляр снизу (ось по центру X=200) -->
-            <path d="M 160,400 L 170,400 L 170,300 L 155,300 L 155,400" fill="#555" />
-            <path d="M 240,400 L 230,400 L 230,300 L 245,300 L 245,400" fill="#555" />
-            <line x1="170" y1="300" x2="230" y2="300" stroke="#333" stroke-width="2" />
+    # Формируем риски шкалы
+    ticks_html = ""
+    for i in range(-200, 201, 10):
+        t_len = 14 if i % 50 == 0 else 7
+        ticks_html += f'<line x1="{svg_mic_x + i}" y1="{svg_mic_y - t_len}" x2="{svg_mic_x + i}" y2="{svg_mic_y + t_len}" stroke="red" stroke-width="1" />'
 
-            <!-- Ростущая капля вверх -->
-            <path id="mic-drop" d="" fill="rgba(135, 206, 250, 0.5)" stroke="lightskyblue" stroke-width="2" />
+    # Перевёрнутая каплевидная форма (растёт вверх от Y=320)
+    # M (старт слева) -> C (кривая к вершине капли) -> A (округлая маковка) -> C (симметричный спуск вниз справа) -> Z (закрытие)
+    path_d = f"M {200-w},320 C {200-w},290 {200-wb},270 {200-wb},240 A {wb},{wb*1.2} 0 0,1 {200+wb},240 C {200+wb},270 {200+w},290 {200+w},320 Z"
+
+    html_code = f"""
+    <div style="background: #111; padding: 10px; border-radius: 8px; width: 420px; margin: 0 auto;">
+        <svg width="400" height="400" viewBox="0 0 400 400" style="background: #030803; border: 3px solid #333; border-radius: 50%;">
+            <style>
+                @keyframes growUpAnimation {{
+                    0% {{ transform: scaleY(0.2) scaleX(0.6) translate(0, 0); opacity: 0.8; }}
+                    85% {{ transform: scaleY(1.0) scaleX(1.0) translate(0, -10px); opacity: 1; }}
+                    93% {{ transform: scaleY(1.0) scaleX(0.8) translate(0, -250px); opacity: 0.3; }}
+                    100% {{ transform: scaleY(0.2) scaleX(0.6) translate(0, 0); opacity: 0; }}
+                }}
+                .drop-tear-mic {{
+                    transform-origin: 200px 320px;
+                    animation: growUpAnimation 4.5s infinite cubic-bezier(0.4, 0, 0.6, 1);
+                }}
+            </style>
+            
+            <!-- Перевернутый капилляр -->
+            <rect x="165" y="320" width="70" height="80" fill="#444" />
+            <rect x="170" y="320" width="60" height="80" fill="#080f08" />
+            
+            <!-- Настоящая каплевидная форма -->
+            <path d="{path_d}" class="drop-tear-mic" fill="rgba(100,200,255,0.55)" stroke="lightskyblue" stroke-width="2" />
 
             <!-- Шкала микроскопа -->
-            <line x1="0" y1="{svg_mic_y}" x2="400" y2="{svg_mic_y}" stroke="rgba(255, 0, 0, 0.7)" stroke-width="1.5" />
-            <line x1="{svg_mic_x}" y1="0" x2="{svg_mic_x}" y2="400" stroke="rgba(255, 0, 0, 0.7)" stroke-width="1.5" />
-            <g id="mic-ticks"></g>
+            <line x1="0" y1="{svg_mic_y}" x2="400" y2="{svg_mic_y}" stroke="rgba(255,0,0,0.8)" stroke-width="1.5" />
+            <line x1="{svg_mic_x}" y1="0" x2="{svg_mic_x}" y2="400" stroke="rgba(255,0,0,0.8)" stroke-width="1.5" />
+            {ticks_html}
         </svg>
     </div>
-
-    <script>
-        // Генерация рисок шкалы (шаг 0.2 мм = 10 пикселей)
-        const ticksG = document.getElementById('mic-ticks');
-        const mx = {svg_mic_x};
-        const my = {svg_mic_y};
-        for(let i = -200; i <= 200; i += 10) {{
-            let tickLen = (i % 50 === 0) ? 14 : 7;
-            let l = document.createElementNS("http://w3.org", "line");
-            l.setAttribute("x1", mx + i); l.setAttribute("y1", my - tickLen);
-            l.setAttribute("x2", mx + i); l.setAttribute("y2", my + tickLen);
-            l.setAttribute("stroke", "red"); l.setAttribute("stroke-width", "1");
-            ticksG.appendChild(l);
-        }}
-
-        const micDrop = document.getElementById('mic-drop');
-        const neckR = {neck_radius};
-        
-        function runMicAnimation() {{
-            let startTime = null;
-            const cycleDuration = 4000; // Полноценные 4 секунды для неспешного замера
-            
-            function frame(timestamp) {{
-                if (!startTime) startTime = timestamp;
-                let elapsed = timestamp - startTime;
-                let progress = (elapsed % cycleDuration) / cycleDuration;
-                
-                if (progress > 0.94) {{
-                    // Капля оторвалась и улетела вверх
-                    let flyP = (progress - 0.94) / 0.06;
-                    let flyY = 220 - (flyP * 300);
-                    let r = neckR * 1.2;
-                    // Округлая форма оторвавшейся капли
-                    micDrop.setAttribute('d', `M ${{200 - r}},${{flyY}} A ${{r}},${{r * 1.2}} 0 1,1 ${{200 + r}},${{flyY}} Z`);
-                }} else {{
-                    // Физически правильное раздувание капли строго по центру X=200
-                    let dropHeight = progress * 90;
-                    let topY = 300 - dropHeight;
-                    let curNeck = 30 - (30 - neckR) * (progress * progress);
-                    let bulbR = curNeck + (38 - curNeck) * Math.sin(progress * Math.PI);
-                    
-                    let d = `M 170,300 
-                             Q ${{200 - curNeck}},${{300 - dropHeight * 0.3}} ${{200 - bulbR}},${{topY + dropHeight * 0.1}} 
-                             A ${{bulbR}},${{bulbR * 1.1}} 0 0,1 ${{200 + bulbR}},${{topY + dropHeight * 0.1}} 
-                             Q ${{200 + curNeck}},${{300 - dropHeight * 0.3}} 230,300 Z`;
-                    micDrop.setAttribute('d', d);
-                }}
-                requestAnimationFrame(frame);
-            }}
-            requestAnimationFrame(frame);
-        }}
-        runMicAnimation();
-    </script>
     """
     return html_code
 
-def generate_stand_svg(target_drops, sigma_true, js_trigger):
-    neck_radius_pixels = max(10.0, min(22.0, (sigma_true * 1000) * 0.3))
+def generate_stand_svg(target_drops, sigma_true, is_running):
+    w = max(8.0, min(20.0, (sigma_true * 1000) * 0.28))
+    wb = w * 1.5
+    
+    # Нормальная каплевидная форма (растёт и падает вниз от Y=60)
+    path_d = f"M {160-w},60 C {160-w},90 {160-wb},110 {160-wb},140 A {wb},{wb*1.2} 0 0,0 {160+wb},140 C {160+wb},110 {160+w},90 {160+w},60 Z"
+    
+    animation_style = ""
+    if is_running:
+        animation_style = """
+        @keyframes dropFallingCycle {
+            0% { transform: scale(0.3) translate(0, 0); opacity: 0.7; }
+            65% { transform: scale(1.0) translate(0, 5px); opacity: 1; }
+            90% { transform: scale(0.9) translate(0, 290px); opacity: 1; }
+            100% { transform: scale(0.3) translate(0, 310px); opacity: 0; }
+        }
+        .drop-tear-stand {
+            transform-origin: 160px 60px;
+            animation: dropFallingCycle 0.9s infinite ease-in;
+        }
+        """
     
     html_code = f"""
-    <div style="background-color: #111; padding: 15px; border-radius: 8px; width: 340px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+    <div style="background: #111; padding: 10px; border-radius: 8px; width: 340px; margin: 0 auto;">
         <svg width="320" height="460" viewBox="0 0 320 460" style="background: #151515; border: 2px solid #333;">
-            <!-- Капилляр сверху -->
-            <path d="M 125,0 L 145,0 L 145,60 L 135,60 L 135,0" fill="#666" />
-            <path d="M 195,0 L 175,0 L 175,60 L 185,60 L 185,0" fill="#666" />
-            <line x1="145" y1="60" x2="175" y2="60" stroke="#444" stroke-width="2" />
+            <style>
+                {animation_style}
+            </style>
+            
+            <!-- Капилляр -->
+            <rect x="135" y="0" width="50" height="60" fill="#555" />
+            <rect x="140" y="0" width="40" height="60" fill="#151515" />
 
-            <!-- Капля на конце трубки -->
-            <path id="stand-drop" d="" fill="rgba(135, 206, 250, 0.5)" stroke="lightskyblue" stroke-width="1.5" />
-            <!-- Падающая капля -->
-            <ellipse id="falling-drop" cx="160" cy="-50" rx="{neck_radius_pixels * 1.2}" ry="{neck_radius_pixels * 1.4}" fill="rgba(135, 206, 250, 0.6)" stroke="lightskyblue" stroke-width="1.5" style="display: none;" />
+            <!-- Каплевидный контур -->
+            <path d="{path_d}" class="{"drop-tear-stand" if is_running else ""}" fill="rgba(100,200,255,0.55)" stroke="lightskyblue" stroke-width="2" style="display: {"block" if is_running else "none"};" />
 
             <!-- Стакан -->
-            <path d="M 90,360 L 90,440 L 230,440 L 230,360" fill="none" stroke="#fff" stroke-width="3" />
-            <rect id="fluid-level" x="93" y="438" width="134" height="2" fill="rgba(135, 206, 250, 0.3)" />
+            <path d="M 90,370 L 90,440 L 230,440 L 230,370" fill="none" stroke="#fff" stroke-width="3" />
+            <!-- Жидкость -->
+            <rect x="93" y="{"390" if is_running else "438"}" width="134" height="{"48" if is_running else "2"}" fill="rgba(100, 200, 255, 0.35)" style="transition: all 2s;" />
         </svg>
     </div>
-
-    <script>
-        const standDrop = document.getElementById('stand-drop');
-        const fallingDrop = document.getElementById('falling-drop');
-        const fluidLevel = document.getElementById('fluid-level');
-        
-        const totalDrops = {target_drops};
-        const neckR = {neck_radius_pixels};
-        let count = 0;
-        
-        function animateStand() {{
-            let startTime = null;
-            const growTime = 700; 
-            const fallTime = 250; 
-            
-            function frame(timestamp) {{
-                if (!startTime) startTime = timestamp;
-                let elapsed = timestamp - startTime;
-                
-                if (elapsed < growTime) {{
-                    fallingDrop.style.display = 'none';
-                    standDrop.style.display = 'block';
-                    let p = elapsed / growTime;
-                    
-                    let dLen = p * 40;
-                    let curY = 60 + dLen;
-                    let curNeck = 15 - (15 - neckR) * (p * p);
-                    let bulb = curNeck + (22 - curNeck) * Math.sin(p * Math.PI);
-                    
-                    let d = `M 145,60 
-                             Q ${{160 - curNeck}},${{60 + dLen * 0.3}} ${{160 - bulb}},${{curY * 0.9}} 
-                             A ${{bulb}},${{bulb * 1.1}} 0 0,0 ${{160 + bulb}},${{curY * 0.9}} 
-                             Q ${{160 + curNeck}},${{60 + dLen * 0.3}} 175,60 Z`;
-                    standDrop.setAttribute('d', d);
-                    requestAnimationFrame(frame);
-                }} else if (elapsed < growTime + fallTime) {{
-                    standDrop.style.display = 'none';
-                    fallingDrop.style.display = 'block';
-                    
-                    let pFall = (elapsed - growTime) / fallTime;
-                    let yCurr = 100 + (300 * pFall * pFall); // Равноускоренное падение строго вниз (X=160)
-                    fallingDrop.setAttribute('cy', yCurr);
-                    requestAnimationFrame(frame);
-                }} else {{
-                    count++;
-                    let h = count * (75 / totalDrops);
-                    fluidLevel.setAttribute('y', 440 - h);
-                    fluidLevel.setAttribute('height', h);
-                    
-                    if (count < totalDrops) {{
-                        startTime = null;
-                        requestAnimationFrame(frame);
-                    }} else {{
-                        fallingDrop.style.display = 'none';
-                        standDrop.setAttribute('d', '');
-                    }}
-                }}
-            }}
-            requestAnimationFrame(frame);
-        }}
-
-        if ({js_trigger}) {{
-            animateStand();
-        }}
-    </script>
     """
     return html_code
