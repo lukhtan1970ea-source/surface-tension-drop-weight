@@ -36,14 +36,21 @@ def generate_microscope_svg(sigma_true, rho_true, mic_x, mic_y):
         
         function solveYoungLaplace(b_param) {{
             let pointsLeft = []; let pointsRight = [];
-            let s = 0.001; let x = 0.001; let y = 0; let phi = 0;
+            let s = 0.0; let x = 0.0001; let y = 0.0; let phi = 0.0;
             let ds = 0.4; let maxSteps = 400;
             
             pointsLeft.push({{x: 200 - x, y: y}});
             pointsRight.unshift({{x: 200 + x, y: y}});
             
+            // ІСПРАВЛЕНО: Розкриття неопределенності при x -> 0 для запобігання NaN
             function derivatives(x_v, y_v, phi_v) {{
-                return [Math.cos(phi_v), Math.sin(phi_v), (2.0 / b_param) + (beta * y_v) - (Math.sin(phi_v) / x_v)];
+                let dx_ds = Math.cos(phi_v);
+                let dy_ds = Math.sin(phi_v);
+                
+                let curvature_term = (x_v < 0.01) ? (1.0 / b_param) : (Math.sin(phi_v) / x_v);
+                let dphi_ds = (2.0 / b_param) + (beta * y_v) - curvature_term;
+                
+                return [dx_ds, dy_ds, dphi_ds];
             }}
             
             for (let step = 0; step < maxSteps; step++) {{
@@ -56,7 +63,7 @@ def generate_microscope_svg(sigma_true, rho_true, mic_x, mic_y):
                 y += (ds / 6.0) * (ky1 + 2.0*ky2 + 2.0*ky3 + ky4);
                 phi += (ds / 6.0) * (kphi1 + 2.0*kphi2 + 2.0*kphi3 + kphi4);
                 
-                if (x >= 30.0 || phi > Math.PI * 1.2 || y > 150) break;
+                if (x >= 30.0 || phi > Math.PI * 1.5 || y > 180) break;
                 pointsLeft.push({{x: 200 - x, y: y}});
                 pointsRight.unshift({{x: 200 + x, y: y}});
             }}
@@ -72,26 +79,30 @@ def generate_microscope_svg(sigma_true, rho_true, mic_x, mic_y):
                 
                 if (p <= 0.85) {{
                     flySphere.style.display = 'none'; dropPath.style.display = 'block';
-                    let b_param = 45.0 - ((p / 0.85) * 24.0); 
+                    // Фізичний параметр b плавно зменшується, збільшуючи об'єм та витягуючи краплю
+                    let b_param = 38.0 - ((p / 0.85) * 19.5); 
                     let [pLeft, pRight, finalX, finalY] = solveYoungLaplace(b_param);
                     
                     let pathString = `M 170,320`;
-                    for (let pt of pLeft) pathString += ` L ${{pt.x.toFixed(1)}},${{(320 - finalY + pt.y).toFixed(1)}}`;
-                    for (let pt of pRight) pathString += ` L ${{pt.x.toFixed(1)}},${{(320 - finalY + pt.y).toFixed(1)}}`;
+                    for (let pt of pLeft) pathString += ` L ${pt.x.toFixed(1)},${(320 - finalY + pt.y).toFixed(1)}`;
+                    for (let pt of pRight) pathString += ` L ${pt.x.toFixed(1)},${(320 - finalY + pt.y).toFixed(1)}`;
                     pathString += ` Z`;
                     
                     dropPath.setAttribute('d', pathString);
                     window.lastFinalY = finalY;
                 }} else if (p <= 0.93) {{
                     let rP = (p - 0.85) / 0.08;
-                    dropPath.setAttribute('d', `M 170,320 A 30,${{4 * (1 - rP)}} 0 0,1 230,320 Z`);
+                    let hRest = 4 * (1 - rP);
+                    dropPath.setAttribute('d', `M 170,320 A 30,${hRest} 0 0,1 230,320 Z`);
                     flySphere.style.display = 'block';
+                    let curY = 320 - window.lastFinalY - (rP * 50);
                     flySphere.setAttribute('cx', '200');
-                    flySphere.setAttribute('cy', 320 - window.lastFinalY - (rP * 50));
-                    flySphere.setAttribute('r', '18');
+                    flySphere.setAttribute('cy', curY);
+                    flySphere.setAttribute('r', '16');
                 }} else {{
                     let fP = (p - 0.93) / 0.07;
-                    flySphere.setAttribute('cy', 320 - window.lastFinalY - 50 - (fP * 250));
+                    let curY = 320 - window.lastFinalY - 50 - (fP * 250);
+                    flySphere.setAttribute('cy', curY);
                 }}
                 requestAnimationFrame(frame);
             }}
@@ -101,6 +112,7 @@ def generate_microscope_svg(sigma_true, rho_true, mic_x, mic_y):
     </script>
     """
     return html_code
+
 
 def generate_stand_svg(target_drops, sigma_true, is_running):
     critical_neck = max(8.0, min(18.0, (sigma_true * 1000) * 0.26))
