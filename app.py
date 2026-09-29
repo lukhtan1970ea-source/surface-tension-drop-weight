@@ -96,7 +96,7 @@ with col2:
         # Обновляем сцену финально
         fig_final = draw_scene("growing", 0.0, 0.0, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
         plot_placeholder.plotly_chart(fig_final, use_container_width=True)
-        st.balloons()with col1:
+        st.balloons()
     st.subheader("🔬 Поле зрения микроскопа")
     plot_placeholder = st.empty()
     # Первичный вывод сцены (фиксированная ширина, статический режим)
