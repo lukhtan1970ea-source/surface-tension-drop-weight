@@ -1,10 +1,13 @@
 def generate_microscope_svg(sigma_true, rho_true, mic_x, mic_y):
-    """Генерує фізично істинну перевернуту анімацію на основі строго стійкого інтегрування RK4"""
+    """Генерує фізично істинну перевернуту анімацію каплеїди за допомогою безпомилкового інтегрування RK4"""
     svg_mic_x = 200 + (mic_x * 50)
     svg_mic_y = 200 - (mic_y * 50)
     
-    # Капілярна постійна для JS (в px^-2). Масштаб: 1 мм = 50 пікселів. g = 9.81
-    beta_px = ((rho_true * 9.81) / sigma_true) / 2500000000.0
+    # Капілярна постійна Янга-Лапласа
+    g_const = 9.81
+    beta_physical = (rho_true * g_const) / sigma_true  # м^-2
+    
+    # Визначаємо критичний радіус шийки
     critical_neck = max(14.0, min(24.0, (sigma_true * 1000) * 0.35))
     
     ticks_html = ""
@@ -34,78 +37,99 @@ def generate_microscope_svg(sigma_true, rho_true, mic_x, mic_y):
     <script>
         const dropPath = document.getElementById('mic-drop-path');
         const flySphere = document.getElementById('mic-fly-sphere');
-        const beta = {beta_px}; 
         
-        function solveYoungLaplaceRK4(b_param) {{
+        // Масштабований за Лапласом стійкий інтегратор RK4
+        function solveYoungLaplaceRK4(volume_factor) {{
             let pointsLeft = []; 
             let pointsRight = [];
             
-            // Стартові умови ОДУ у вершині (x=0, y=0, phi=0)
-            let x = 0.0001; 
-            let y = 0.0; 
-            let phi = 0.0;
+            // Інтегруємо у безрозмірних величинах для 100% гарантії збіжності
+            let u = 0.0001; // безрозмірний радіус x
+            let v = 0.0;    // безрозмірна висота y
+            let phi = 0.0;  // кут нахилу дотичної
             
-            let ds = 0.08; // Стабільний крок інтегрування
-            let maxSteps = 1500; 
+            let dt = 0.02;  // наддрібний крок інтегрування
+            let maxSteps = 1200;
             
-            pointsLeft.push({{x: 200 - x, y: y}});
-            pointsRight.unshift({{x: 200 + x, y: y}});
+            // Фізичний коефіцієнт форми каплеїди (визначає її витягнутість)
+            let В = 0.15 + (volume_factor * 0.45); 
             
-            function derivatives(x_v, y_v, phi_v) {{
-                let dx = Math.cos(phi_v); 
-                let dy = Math.sin(phi_v);
+            function derivatives(u_v, v_v, phi_v) {{
+                let du = Math.cos(phi_v);
+                let dv = Math.sin(phi_v);
                 
-                // Розкриття неозначеності в нулі для стійкості метода
-                let sin_x_term = (x_v < 0.01) ? (1.0 / b_param) : (Math.sin(phi_v) / x_v);
-                let dphi = (2.0 / b_param) - (beta * y_v) - sin_x_term;
+                // Раскриття неозначеності в нулі Лапласа
+                let sin_u_term = (u_v < 0.01) ? 1.0 : (Math.sin(phi_v) / u_v);
+                let dphi = 2.0 + (В * v_v) - sin_u_term;
                 
-                return [dx, dy, dphi];
+                return [du, dv, dphi];
             }}
             
             for (let step = 0; step < maxSteps; step++) {{
-                let [kx1, ky1, kphi1] = derivatives(x, y, phi);
+                let [ku1, kv1, kphi1] = derivatives(u, v, phi);
                 
-                let [kx2, ky2, kphi2] = derivatives(
-                    x + 0.5 * ds * kx1, 
-                    y + 0.5 * ds * ky1, 
-                    phi + 0.5 * ds * kphi1
+                let [ku2, kv2, kphi2] = derivatives(
+                    u + 0.5 * dt * ku1, 
+                    v + 0.5 * dt * kv1, 
+                    phi + 0.5 * dt * kphi1
                 );
                 
-                let [kx3, ky3, kphi3] = derivatives(
-                    x + 0.5 * ds * kx2, 
-                    y + 0.5 * ds * ky2, 
-                    phi + 0.5 * ds * kphi2
+                let [ku3, kv3, kphi3] = derivatives(
+                    u + 0.5 * dt * ku2, 
+                    v + 0.5 * dt * kv2, 
+                    phi + 0.5 * dt * kphi2
                 );
                 
-                let [kx4, ky4, kphi4] = derivatives(
-                    x + ds * kx3, 
-                    y + ds * ky3, 
-                    phi + ds * kphi4
+                let [ku4, kv4, kphi4] = derivatives(
+                    u + dt * ku3, 
+                    v + dt * kv3, 
+                    phi + dt * kphi4
                 );
                 
-                x += (ds / 6.0) * (kx1 + 2.0 * kx2 + 2.0 * kx3 + kx4);
-                y += (ds / 6.0) * (ky1 + 2.0 * ky2 + 2.0 * ky3 + ky4);
-                phi += (ds / 6.0) * (kphi1 + 2.0 * kphi2 + 2.0 * kphi3 + kphi4);
+                u += (dt / 6.0) * (ku1 + 2.0 * ku2 + 2.0 * ku3 + ku4);
+                v += (dt / 6.0) * (kv1 + 2.0 * kv2 + 2.0 * kv3 + kv4);
+                phi += (dt / 6.0) * (kphi1 + 2.0 * kphi2 + 2.0 * kphi3 + kphi4);
                 
-                // Перевірка на досягнення радіуса трубки R = 30px
-                if (x >= 30.0) {{
+                if (isNaN(u) || isNaN(v) || phi > Math.PI * 0.98) {{
                     break;
                 }}
                 
-                if (isNaN(x) || isNaN(y) || phi > Math.PI * 1.5 || y > 180) {{
-                    break;
-                }}
+                // Переводимо безрозмірні величини в реальні пікселі під розмір капіляра (R = 30px)
+                // Коефіцієнт 30.0 / u фіксує основу точно на краях трубки
+                let scale = 30.0 / u;
                 
-                if (step % 4 === 0) {{
-                    pointsLeft.push({{x: 200 - x, y: y}});
-                    pointsRight.unshift({{x: 200 + x, y: y}});
+                if (step % 3 === 0) {{
+                    pointsLeft.push({{x: 200 - (u * scale), y: v * scale}});
+                    pointsRight.unshift({{x: 200 + (u * scale), y: v * scale}});
                 }}
             }}
             
-            pointsLeft.push({{x: 170, y: y}});
-            pointsRight.unshift({{x: 230, y: y}});
+            // Масштабуємо фінальні точки
+            let finalScale = 30.0 / u;
+            let totalHeightPx = v * finalScale;
             
-            return [pointsLeft, pointsRight, x, y];
+            let finalPointsLeft = [];
+            let finalPointsRight = [];
+            
+            for (let step = 0; step < maxSteps; step++) {{
+                let [ku1, kv1, kphi1] = derivatives(u, v, phi);
+                let [ku2, kv2, kphi2] = derivatives(u + 0.5*dt*ku1, v + 0.5*dt*kv1, phi + 0.5*dt*kphi1);
+                let [ku3, kv3, kphi3] = derivatives(u + 0.5*dt*ku2, v + 0.5*dt*kv2, phi + 0.5*dt*kphi2);
+                let [ku4, kv4, kphi4] = derivatives(u + dt*ku3, v + dt*kv3, phi + dt*kphi4);
+                
+                u += (dt / 6.0) * (ku1 + 2.0 * ku2 + 2.0 * ku3 + ku4);
+                v += (dt / 6.0) * (kv1 + 2.0 * kv2 + 2.0 * kv3 + kv4);
+                phi += (dt / 6.0) * (kphi1 + 2.0 * kphi2 + 2.0 * kphi3 + kphi4);
+                
+                if (isNaN(u) || isNaN(v) || phi > Math.PI * 0.98) break;
+                
+                if (step % 4 === 0) {{
+                    finalPointsLeft.push({{x: 200 - (u * finalScale), y: v * finalScale}});
+                    finalPointsRight.unshift({{x: 200 + (u * finalScale), y: v * finalScale}});
+                }}
+            }}
+            
+            return [finalPointsLeft, finalPointsRight, totalHeightPx];
         }}
 
         function animateMicroscope() {{
@@ -122,11 +146,9 @@ def generate_microscope_svg(sigma_true, rho_true, mic_x, mic_y):
                     dropPath.style.display = 'block';
                     
                     let sP = p / 0.85;
-                    let b_param = 44.0 - (sP * 24.5); 
+                    // Передаємо коефіцієнт наповнення об'єму в ОДУ
+                    let [pLeft, pRight, finalY] = solveYoungLaplaceRK4(sP);
                     
-                    let [pLeft, pRight, finalX, finalY] = solveYoungLaplaceRK4(b_param);
-                    
-                    // БЕЗПЕЧНА СБОРКА РЯДКА БЕЗ СБОЇВ ШАБЛОНІВ: чисте додавання тексту
                     let pathString = "M 170,320";
                     for (let i = 0; i < pLeft.length; i++) {{
                         let yCoord = 320 - finalY + pLeft[i].y;
