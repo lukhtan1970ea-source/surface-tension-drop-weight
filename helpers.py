@@ -86,13 +86,16 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let xLeftN = 200 - curNeck;
                     let xRightN = 200 + curNeck;
                     
-                    // Контрольные точки по Y для плавного изгиба мешочка
-                    let yCtrl1 = 310;
-                    let yCtrl2 = topY + (totalH * 0.3);
+                    // Симметричные контрольные точки по Y для плавного изгиба мешочка
+                    let yCtrl = topY + (totalH * 0.3);
                     
-                    // Идеально отформатированный путь SVG с правильными запятыми между X и Y
-                    let d = `M 170,320 C 170,${{yCtrl1}} ${{xLeftN}},300 ${{xLeftB}},${{yCtrl2}} A ${{bulbR}},${{bulbR * 1.1}} 0 0,1 ${{xRightB}},${{yCtrl2}} C ${{xRightN}},300 230,${{yCtrl1}} 230,320 Z`;
+                    // ИСПРАВЛЕНО: флаг дуги изменен на 0,0 для идеального перевернутого купола
+                    let d = `M 170,320 
+                             C 170,310 ${{xLeftN}},300 ${{xLeftB}},${{yCtrl}} 
+                             A ${{bulbR}},${{bulbR * 1.1}} 0 0,0 ${{xRightB}},${{yCtrl}} 
+                             C ${{xRightN}},300 230,310 230,320 Z`;
                     dropPath.setAttribute('d', d);
+
 
                     
                 }} else if (p <= 0.94) {{
