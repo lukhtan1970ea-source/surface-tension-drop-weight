@@ -16,14 +16,14 @@ def get_physical_properties(liquid_name, temp_c):
     return max(0.005, sigma), max(500.0, rho)
 
 def generate_microscope_svg(sigma_true, mic_x, mic_y):
-    # Масштаб мікроскопа: 1 мм = 50 пікселів.
+    # Масштаб мікроскопа: 1 мм = 50 пікселів. Капіляр зафіксовано на X=170 та X=230 (радіус 30px)
     svg_mic_x = 200 + (mic_x * 50)
     svg_mic_y = 200 - (mic_y * 50)
     
-    # Граничний радіус шийки при відриві
-    critical_neck = max(12.0, min(26.0, (sigma_true * 1000) * 0.36))
+    # Клінічний радіус шийки при відриві (залежить від рідини)
+    critical_neck = max(14.0, min(25.0, (sigma_true * 1000) * 0.35))
     
-    # Генерація вимірювальних рисок шкали мікроскопа
+    # Генерація червоних рисок шкали мікроскопа
     ticks_html = ""
     for i in range(-200, 201, 10):
         t_len = 14 if i % 50 == 0 else 7
@@ -39,7 +39,7 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
 
             <!-- Тіло краплі -->
             <path id="mic-drop-path" d="" fill="rgba(100,200,255,0.55)" stroke="lightskyblue" stroke-width="2" />
-            <!-- Летяча сфера -->
+            <!-- Летяча сфера відриву -->
             <circle id="mic-fly-sphere" cx="200" cy="-50" r="0" fill="rgba(100,200,255,0.6)" stroke="lightskyblue" stroke-width="1.5" style="display:none;" />
 
             <!-- Шкала мікроскопа поверх капли -->
@@ -63,52 +63,50 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                 let elapsed = timestamp - startTime;
                 let p = (elapsed % duration) / duration;
                 
-                if (p <= 0.3) {{
-                    // ФАЗА 1: Сегмент сфери (меніск). Краї чітко на 170 і 230
+                if (p <= 0.25) {{
+                    // ФАЗА 1: Початковий сферичний меніск (сегмент росте вгору)
                     flySphere.style.display = 'none';
                     dropPath.style.display = 'block';
-                    let rStage = p / 0.3; 
-                    let h = rStage * 18; 
+                    let stage = p / 0.25;
+                    let h = stage * 16;
                     let d = `M 170,320 A 30,${{h}} 0 0,1 230,320 Z`;
                     dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Вытягивание в мешочек с идеальным сглаживанием у капилляра
-                    let sP = (p - 0.3) / 0.58; 
-                    let totalH = 18 + (sP * 72); 
+                    // ФАЗА 2: Наливання реалістичної ГРУШІ з фотографії
+                    let sP = (p - 0.25) / 0.63; 
+                    let totalH = 16 + (sP * 74); // Загальна висота росте до 90px
                     let topY = 320 - totalH;
                     
+                    // Шейка плавно звужується, а пузо розширюється значно ширше капіляра (до 44px)
                     let curNeck = 30 - (30 - critNeck) * (sP * sP);
-                    let bulbR = curNeck + (36 - curNeck) * Math.sin(sP * Math.PI);
+                    let bulbR = curNeck + (44 - curNeck) * Math.sin(sP * Math.PI / 2);
                     
-                    let xLeftB  = 200 - bulbR;
-                    let xRightB = 200 + bulbR;
-                    let xLeftN  = 200 - curNeck;
+                    let xLeftN = 200 - curNeck;
                     let xRightN = 200 + curNeck;
+                    let xLeftB = 200 - bulbR;
+                    let xRightB = 200 + bulbR;
                     
-                    // Высоты контрольных точек
-                    let yNeck = 320 - (totalH * 0.3);  // Перетяжка шейки чуть выше
-                    let yBulb = topY + (totalH * 0.4);  // Максимальное расширение
-                    
-                    // Скругляющий коэффициент для макушки
-                    let ctrlTopX = bulbR * 0.55; 
-                    
-                    // ИСПРАВЛЕНО: Контрольные точки у основания (170,305 и 230,305) 
-                    // заставляют контур выходить из капилляра вертикально, убирая "зуб"
-                    let d = `M 170,320 
-                             C 170,305 ${{xLeftN}},${{yNeck}} ${{xLeftN}},${{yNeck}} 
-                             C ${{xLeftN}},${{yNeck}} ${{xLeftB}},${{yNeck + totalH*0.1}} ${{xLeftB}},${{yBulb}} 
-                             C ${{xLeftB}},${{topY + totalH*0.15}} ${{200 - ctrlTopX}},${{topY}} 200,${{topY}} 
-                             C ${{200 + ctrlTopX}},${{topY}} ${{xRightB}},${{topY + totalH*0.15}} ${{xRightB}},${{yBulb}} 
-                             C ${{xRightB}},${{yNeck + totalH*0.1}} ${{xRightN}},${{yNeck}} ${{xRightN}},${{yNeck}} 
-                             C ${{xRightN}},${{yNeck}} 230,305 230,320 Z`;
-                             
-                    dropPath.setAttribute('d', d);
+                    // Коротка шийка знаходиться низько, відразу над зрізом трубки
+                    let yNeck = 320 - (totalH * 0.22); 
+                    // Початок купола великої луковиці
+                    let yBulbStart = topY + bulbR; 
 
+                    // Математично стабільна збірка контуру груші:
+                    // Спочатку йде коротка увігнута шийка, потім розширення у луковицю, 
+                    // а макушка малюється ідеальною круговою дугою окружності (A)
+                    let d = "M 170,320 " +
+                            "C 170,312 " + xLeftN + "," + yNeck + " " + xLeftN + "," + yNeck + " " +
+                            "C " + xLeftN + "," + yNeck + " " + xLeftB + "," + (yNeck - 15) + " " + xLeftB + "," + yBulbStart + " " +
+                            "A " + bulbR + "," + bulbR + " 0 0,1 " + xRightB + "," + yBulbStart + " " +
+                            "C " + xRightB + "," + (yNeck - 15) + " " + xRightN + "," + yNeck + " " + xRightN + "," + yNeck + " " +
+                            "C " + xRightN + "," + yNeck + " 230,312 230,320 Z";
+                            
+                    dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.94) {{
-                    // ФАЗА 3: Відрив та релаксація в сферу
-                    let rP = (p - 0.88) / 0.06; 
+                    // ФАЗА 3: Миттєвий розрив. Залишок втягується, сфера летить вгору
+                    let rP = (p - 0.88) / 0.06;
                     let hRest = 4 * (1 - rP);
                     let dRest = `M 170,320 A 30,${{hRest}} 0 0,1 230,320 Z`;
                     dropPath.setAttribute('d', dRest);
@@ -118,17 +116,17 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     
                     let sphereR = critNeck * 1.15;
                     let startY = 320 - 90;
-                    let curY = startY - (rP * 40); 
+                    let curY = startY - (rP * 50);
                     
                     flySphere.setAttribute('cx', '200');
                     flySphere.setAttribute('cy', curY);
                     flySphere.setAttribute('r', sphereR);
                     
                 }} else {{
-                    // ФАЗА 4: Політ сфери в небуття
-                    let fP = (p - 0.94) / 0.06; 
-                    let startY = 320 - 90 - 40;
-                    let curY = startY - (fP * 260); 
+                    // ФАЗА 4: Політ сферичної краплі в небуття
+                    let fP = (p - 0.94) / 0.06;
+                    let startY = 320 - 90 - 50;
+                    let curY = startY - (fP * 250);
                     
                     flySphere.setAttribute('cy', curY);
                 }}
@@ -147,17 +145,17 @@ def generate_stand_svg(target_drops, sigma_true, is_running):
     if is_running:
         animation_style = f"""
         @keyframes standCycle {{
-            0% {{ d: path('M 145,60 A 15,2 0 0,0 175,60 Z'); opacity: 1; }}
-            25% {{ d: path('M 145,60 A 15,12 0 0,0 175,60 Z'); opacity: 1; }}
-            50% {{ d: path('M 145,60 C 145,65 150,75 146,85 A 14,15 0 0,0 174,85 C 170,75 175,65 175,60 Z'); opacity: 1; }}
-            75% {{ d: path('M 145,60 C 145,65 {160 - critical_neck},75 {160 - critical_neck * 1.3},100 A {critical_neck * 1.3},{critical_neck * 1.4} 0 0,0 {160 + critical_neck * 1.3},100 C {160 + critical_neck},75 175,65 175,60 Z'); opacity: 1; }}
-            76% {{ d: path('M 145,60 A 15,1 0 0,0 175,60 Z'); opacity: 1; }}
-            100% {{ d: path('M 145,60 A 15,1 0 0,0 175,60 Z'); opacity: 1; }}
+            0% {{ d: path('M 145,60 A 15,2 0 0,0 175,60 Z'); }}
+            25% {{ d: path('M 145,60 A 15,12 0 0,0 175,60 Z'); }}
+            50% {{ d: path('M 145,60 C 145,65 150,72 146,80 A 14,14 0 0,0 174,80 C 170,72 175,65 175,60 Z'); }}
+            75% {{ d: path('M 145,60 C 145,65 {160 - critical_neck},72 {160 - critical_neck * 1.3},90 A {critical_neck * 1.3},{critical_neck * 1.3} 0 0,0 {160 + critical_neck * 1.3},90 C {160 + critical_neck},72 175,65 175,60 Z'); }}
+            76% {{ d: path('M 145,60 A 15,1 0 0,0 175,60 Z'); }}
+            100% {{ d: path('M 145,60 A 15,1 0 0,0 175,60 Z'); }}
         }}
         @keyframes flySphereCycle {{
             0% {{ transform: translateY(0px); opacity: 0; }}
             75% {{ transform: translateY(0px); opacity: 0; }}
-            76% {{ transform: translateY(50px); opacity: 1; }}
+            76% {{ transform: translateY(40px); opacity: 1; }}
             98% {{ transform: translateY(320px); opacity: 1; }}
             100% {{ transform: translateY(330px); opacity: 0; }}
         }}
