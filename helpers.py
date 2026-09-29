@@ -1,6 +1,5 @@
 import numpy as np
 
-# Довідкові дані рідин при 20°C
 LIQUIDS = {
     "Вода (H2O)": {"sigma_20": 72.75, "rho_20": 0.998, "temp_coeff": -0.165},
     "Етанол (C2H5OH)": {"sigma_20": 22.27, "rho_20": 0.789, "temp_coeff": -0.086},
@@ -16,33 +15,27 @@ def get_physical_properties(liquid_name, temp_c):
     return max(0.005, sigma), max(500.0, rho)
 
 def generate_microscope_svg(sigma_true, mic_x, mic_y):
-    # Масштаб мікроскопа: 1 мм = 50 пікселів. Капіляр зафіксовано на X=170 та X=230 (радіус 30px)
     svg_mic_x = 200 + (mic_x * 50)
     svg_mic_y = 200 - (mic_y * 50)
-    
-    # Клінічний радіус шийки при відриві (залежить від рідини)
     critical_neck = max(14.0, min(25.0, (sigma_true * 1000) * 0.35))
     
-    # Генерація червоних рисок шкали мікроскопа
     ticks_html = ""
     for i in range(-200, 201, 10):
         t_len = 14 if i % 50 == 0 else 7
         ticks_html += f'<line x1="{svg_mic_x + i}" y1="{svg_mic_y - t_len}" x2="{svg_mic_x + i}" y2="{svg_mic_y + t_len}" stroke="red" stroke-width="1" />'
 
+    # Передаем JS чистый текстовый блок. Обратите внимание на удвоенные {{ }} для Python,
+    # которые превратятся в одинарные { } в итоговом JavaScript.
     html_code = f"""
     <div style="background: #111; padding: 10px; border-radius: 8px; width: 420px; margin: 0 auto;">
         <svg width="400" height="400" viewBox="0 0 400 400" style="background: #030703; border: 3px solid #333; border-radius: 50%;">
-            <!-- Перевернутий капіляр знизу -->
             <path d="M 165,400 L 170,400 L 170,320 L 155,320 L 155,400" fill="#444" />
             <path d="M 235,400 L 230,400 L 230,320 L 245,320 L 245,400" fill="#444" />
             <line x1="170" y1="320" x2="230" y2="320" stroke="#222" stroke-width="2" />
 
-            <!-- Тіло краплі -->
             <path id="mic-drop-path" d="" fill="rgba(100,200,255,0.55)" stroke="lightskyblue" stroke-width="2" />
-            <!-- Летяча сфера відриву -->
             <circle id="mic-fly-sphere" cx="200" cy="-50" r="0" fill="rgba(100,200,255,0.6)" stroke="lightskyblue" stroke-width="1.5" style="display:none;" />
 
-            <!-- Шкала мікроскопа поверх капли -->
             <line x1="0" y1="{svg_mic_y}" x2="400" y2="{svg_mic_y}" stroke="rgba(255,0,0,0.8)" stroke-width="1.5" />
             <line x1="{svg_mic_x}" y1="0" x2="{svg_mic_x}" y2="400" stroke="rgba(255,0,0,0.8)" stroke-width="1.5" />
             {ticks_html}
@@ -64,7 +57,6 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                 let p = (elapsed % duration) / duration;
                 
                 if (p <= 0.25) {{
-                    // ФАЗА 1: Початковий сферичний меніск (сегмент росте вгору)
                     flySphere.style.display = 'none';
                     dropPath.style.display = 'block';
                     let stage = p / 0.25;
@@ -73,12 +65,10 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Наливання реалістичної ГРУШІ з фотографії
                     let sP = (p - 0.25) / 0.63; 
-                    let totalH = 16 + (sP * 74); // Загальна висота росте до 90px
+                    let totalH = 16 + (sP * 74); 
                     let topY = 320 - totalH;
                     
-                    // Шейка плавно звужується, а пузо розширюється значно ширше капіляра (до 44px)
                     let curNeck = 30 - (30 - critNeck) * (sP * sP);
                     let bulbR = curNeck + (44 - curNeck) * Math.sin(sP * Math.PI / 2);
                     
@@ -87,25 +77,20 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let xLeftB = 200 - bulbR;
                     let xRightB = 200 + bulbR;
                     
-                    // Коротка шийка знаходиться низько, відразу над зрізом трубки
                     let yNeck = 320 - (totalH * 0.22); 
-                    // Початок купола великої луковиці
                     let yBulbStart = topY + bulbR; 
 
-                    // Математично стабільна збірка контуру груші:
-                    // Спочатку йде коротка увігнута шийка, потім розширення у луковицю, 
-                    // а макушка малюється ідеальною круговою дугою окружності (A)
-                    let d = "M 170,320 " +
-                            "C 170,312 " + xLeftN + "," + yNeck + " " + xLeftN + "," + yNeck + " " +
-                            "C " + xLeftN + "," + yNeck + " " + xLeftB + "," + (yNeck - 15) + " " + xLeftB + "," + yBulbStart + " " +
-                            "A " + bulbR + "," + bulbR + " 0 0,1 " + xRightB + "," + yBulbStart + " " +
-                            "C " + xRightB + "," + (yNeck - 15) + " " + xRightN + "," + yNeck + " " + xRightN + "," + yNeck + " " +
-                            "C " + xRightN + "," + yNeck + " 230,312 230,320 Z";
+                    // Чистые шаблонные строки JS без ломающих плюсов и склеек текста
+                    let d = `M 170,320 
+                             C 170,312 ${{xLeftN}},${{yNeck}} ${{xLeftN}},${{yNeck}} 
+                             C ${{xLeftN}},${{yNeck}} ${{xLeftB}},${{yNeck - 15}} ${{xLeftB}},${{yBulbStart}} 
+                             A ${{bulbR}},${{bulbR}} 0 0,1 ${{xRightB}},${{yBulbStart}} 
+                             C ${{xRightB}},${{yNeck - 15}} ${{xRightN}},${{yNeck}} ${{xRightN}},${{yNeck}} 
+                             C ${{xRightN}},${{yNeck}} 230,312 230,320 Z`;
                             
                     dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.94) {{
-                    // ФАЗА 3: Миттєвий розрив. Залишок втягується, сфера летить вгору
                     let rP = (p - 0.88) / 0.06;
                     let hRest = 4 * (1 - rP);
                     let dRest = `M 170,320 A 30,${{hRest}} 0 0,1 230,320 Z`;
@@ -123,7 +108,6 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     flySphere.setAttribute('r', sphereR);
                     
                 }} else {{
-                    // ФАЗА 4: Політ сферичної краплі в небуття
                     let fP = (p - 0.94) / 0.06;
                     let startY = 320 - 90 - 50;
                     let curY = startY - (fP * 250);
