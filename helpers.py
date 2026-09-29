@@ -72,7 +72,7 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let d = `M 170,320 A 30,${{h}} 0 0,1 230,320 Z`;
                     dropPath.setAttribute('d', d);
                     
-                }                } else if (p <= 0.88) {{
+                }} else if (p <= 0.88) {{
                     // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Гладкий сплайн)
                     let sP = (p - 0.3) / 0.58; 
                     let totalH = 18 + (sP * 72); 
