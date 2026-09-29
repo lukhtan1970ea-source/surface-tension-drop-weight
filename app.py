@@ -1,9 +1,10 @@
 import streamlit as st
 import numpy as np
 from physics import LIQUIDS, get_physical_properties
-from helpers import generate_microscope_svg, generate_stand_svg
+from microscope_engine import generate_microscope_svg
+from helpers import generate_stand_svg
 
-# Налаштування сторінки
+# Базове налаштування сторінки
 st.set_page_config(page_title="Stalagmometer Pro Sim", layout="wide")
 
 # ==========================================
@@ -33,24 +34,24 @@ def reset_stand_state():
     st.session_state.experiment_triggered = False
     st.session_state.tare_weight = round(25.123 + np.random.uniform(-0.5, 0.5), 3)
 
-# Скидання параметрів при зміні умов досліду
+# Автоматичний скид при зміні рідини або температури
 if selected_liquid != st.session_state.last_liquid or temperature != st.session_state.last_temp:
     st.session_state.last_liquid = selected_liquid
     st.session_state.last_temp = temperature
     reset_stand_state()
 
-# Звернення до фізичного модуля
+# Розрахунок фізики
 sigma_true, rho_true = get_physical_properties(selected_liquid, temperature)
 R_capillary = 0.0015  
 g = 9.81
 mass_one_drop_true = (2 * np.pi * R_capillary * sigma_true) / g
 
-# Додавання живого шуму для ваг
+# Додавання індивідуального шуму для ваг
 np.random.seed(int(temperature * 7))
 actual_mass_one_drop = max(1e-6, mass_one_drop_true + np.random.normal(0, mass_one_drop_true * 0.005))
 
 # ==========================================
-# 3. ВЕРХНЯ ПАНЕЛЬ УПРАВЛЕНИЯ
+# 3. ВЕРХНЯ ПАНЕЛЬ УПРАВЛІННЯ
 # ==========================================
 ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([1.5, 1.5, 1.0])
 
@@ -76,7 +77,7 @@ with ctrl_col3:
 st.markdown(" ")
 
 # ==========================================
-# 4. ГОЛОВНІ ВКЛАДКИ СТЕНДУ
+# 4. ГОЛОВНІ ВКЛАДКИ
 # ==========================================
 tab1, tab2 = st.tabs(["🔍 Окуляр мікроскопа (Вимірювання шийки)", "⚖️ Лабораторний стенд (Зважування крапель)"])
 
@@ -87,10 +88,10 @@ with tab1:
         st.markdown("### 🎛️ Налаштування візира мікроскопа")
         mic_x = st.slider("Зсув шкали по горизонталі X (мм)", -2.0, 2.0, 0.0, 0.05)
         mic_y = st.slider("Зсув шкали по вертикалі Y (мм)", -4.0, 4.0, 0.0, 0.05)
-        st.info("🔬 **Порада для студентів:** За допомогою червоної шкали визначте діаметр шийки краплі у найвужчому місці безпосередньо перед моментом її відриву.")
+        st.info("🔬 **Порада для студентів:** Сумістіть вертикальну лінію червоної шкали з бічною межею шийки краплі безпосередньо в момент її найбільшого витягування за допомогою Рунге-Кутти (перед самим відривом).")
         
     with col_mic_left:
-        # Передаємо значення sigma та rho у чисельний інтегратор
+        # Передаємо параметри у чисельний інтегратор
         mic_svg = generate_microscope_svg(sigma_true, rho_true, mic_x, mic_y)
         st.components.v1.html(mic_svg, height=440, scrolling=False)
 
@@ -98,7 +99,7 @@ with tab2:
     col_st_left, col_st_right = st.columns([1.0, 1.2])
     
     with col_st_right:
-        st.markdown("### ⚖️ Показання електронних ваг")
+        st.markdown("### ⚖️ Показання電子ваг")
         
         w_col1, w_col2 = st.columns(2)
         w_col1.metric(label="Маса сухої склянки ($m_0$)", value=f"{st.session_state.tare_weight:.3f} г")
@@ -107,6 +108,7 @@ with tab2:
         st.info(f"**Маса чистої фракції крапель (Δm):** {max(0.0, current_weight - st.session_state.tare_weight):.3f} г")
             
     with col_st_left:
+        # Сцена стенду
         stand_svg = generate_stand_svg(target_drops, sigma_true, st.session_state.experiment_triggered)
         st.components.v1.html(stand_svg, height=480, scrolling=False)
 
