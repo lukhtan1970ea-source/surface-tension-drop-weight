@@ -72,8 +72,8 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let d = `M 170,320 A 30,${{h}} 0 0,1 230,320 Z`;
                     dropPath.setAttribute('d', d);
                     
-                }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Анатомический Безье)
+                }                } else if (p <= 0.88) {{
+                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Гладкий сплайн)
                     let sP = (p - 0.3) / 0.58; 
                     let totalH = 18 + (sP * 72); 
                     let topY = 320 - totalH;
@@ -81,25 +81,24 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let curNeck = 30 - (30 - critNeck) * (sP * sP);
                     let bulbR = curNeck + (36 - curNeck) * Math.sin(sP * Math.PI);
                     
-                    // Левая и правая границы пузатой части капли
                     let xLeftB = 200 - bulbR;
                     let xRightB = 200 + bulbR;
-                    
-                    // Левая и правая границы узкой шейки капли
                     let xLeftN = 200 - curNeck;
                     let xRightN = 200 + curNeck;
                     
-                    // Высоты контрольных точек
-                    let yNeck = 320 - (totalH * 0.25); // Позиция шейки (чуть выше капилляра)
-                    let yBulb = topY + (totalH * 0.35); // Позиция пузатой части капли
+                    // Расчет высот для контрольных точек натяжения жидкости
+                    let yCtrl1 = 320 - (totalH * 0.15); // Шейка чуть выше капилляра
+                    let yCtrl2 = topY + (totalH * 0.3);  // Пузо капли
                     
-                    // ЧЕТЫРЕ КРИВЫЕ: Сначала сужение к шейке, затем расширение к пузу, закругление макушки и симметричный спуск
+                    // Идеально гладкий жидкий контур через M -> C -> S -> S -> S -> Z
+                    // Никаких изломов: каждая последующая точка плавно вытекает из предыдущей
                     let d = `M 170,320 
-                             Q 170,${{yNeck}} ${{xLeftN}},${{yNeck}} 
-                             C ${{xLeftN}},${{yNeck}} ${{xLeftB}},${{yBulb}} ${{xLeftB}},${{topY + (totalH * 0.5)}} 
-                             A ${{bulbR}},${{bulbR}} 0 0,1 ${{xRightB}},${{topY + (totalH * 0.5)}} 
-                             C ${{xRightB}},${{yBulb}} ${{xRightN}},${{yNeck}} ${{xRightN}},${{yNeck}} 
-                             Q 230,${{yNeck}} 230,320 Z`;
+                             C 170,${{yCtrl1}} ${{xLeftN}},${{yCtrl1}} ${{xLeftN}},${{310}} 
+                             C ${{xLeftN}},290 ${{xLeftB}},${{yCtrl2}} ${{xLeftB}},${{topY + (totalH * 0.5)}} 
+                             S 190,${{topY}} 200,${{topY}} 
+                             S ${{xRightB}},${{topY + (totalH * 0.5)}} ${{xRightB}},${{topY + (totalH * 0.5)}}
+                             C ${{xRightB}},${{yCtrl2}} ${{xRightN}},290 ${{xRightN}},310
+                             C ${{xRightN}},${{yCtrl1}} 230,${{yCtrl1}} 230,320 Z`;
                     dropPath.setAttribute('d', d);
 
                     
