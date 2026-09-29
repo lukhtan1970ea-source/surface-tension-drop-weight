@@ -73,64 +73,56 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Полигональный расчет)
+                    // ФАЗА 2: Вытягивание в мешочек с идеальной сферической макушкой
                     let sP = (p - 0.3) / 0.58; 
                     let totalH = 18 + (sP * 72); 
-                    let topY = 320 - totalH;
                     
                     let curNeck = 30 - (30 - critNeck) * (sP * sP);
                     let bulbR = curNeck + (36 - curNeck) * Math.sin(sP * Math.PI);
                     
-                    // Строим контур по точкам (снизу вверх по левой стороне, и сверху вниз по правой)
-                    let points = [];
-                    let steps = 40;
+                    let pointsLeft = [];
+                    let pointsRight = [];
+                    let steps = 30;
                     
-                    // Левая сторона капли (снизу вверх)
+                    // Расчет профиля до макушки (нижние 70% высоты капли)
                     for (let i = 0; i <= steps; i++) {{
-                        let t = i / steps; // параметр от 0 до 1
+                        let t = (i / steps) * 0.7; // только до 0.7 высоты
                         let y = 320 - (t * totalH);
                         
                         let r = 0;
-                        if (t < 0.25) {{
-                            // Плавный переход от края капилляра (30) к самой узкой шейке (curNeck)
-                            let k = t / 0.25;
+                        if (t < 0.2) {{
+                            let k = t / 0.2;
                             r = 30 - (30 - curNeck) * Math.sin(k * Math.PI / 2);
                         }} else {{
-                            // Плавное расширение от шейки к пузу и сужение к макушке
-                            let k = (t - 0.25) / 0.75;
-                            // Базовый профиль капли по синусоиде
-                            r = curNeck + (bulbR - curNeck) * Math.sin(k * Math.PI);
-                            // Скругление к макушке
-                            if (k > 0.7) {{
-                                let edge = (k - 0.7) / 0.3;
-                                r *= Math.cos(edge * Math.PI / 2);
-                            }}
+                            let k = (t - 0.2) / 0.5;
+                            r = curNeck + (bulbR - curNeck) * Math.sin(k * Math.PI / 2);
                         }}
-                        points.push((200 - r) + "," + y);
-                    }}
-                    
-                    // Правая сторона капли (зеркально сверху вниз)
-                    for (let i = steps; i >= 0; i--) {{
-                        let t = i / steps;
-                        let y = 320 - (t * totalH);
                         
-                        let r = 0;
-                        if (t < 0.25) {{
-                            let k = t / 0.25;
-                            r = 30 - (30 - curNeck) * Math.sin(k * Math.PI / 2);
-                        }} else {{
-                            let k = (t - 0.25) / 0.75;
-                            r = curNeck + (bulbR - curNeck) * Math.sin(k * Math.PI);
-                            if (k > 0.7) {{
-                                let edge = (k - 0.7) / 0.3;
-                                r *= Math.cos(edge * Math.PI / 2);
-                            }}
-                        }}
-                        points.push((200 + r) + "," + y);
+                        pointsLeft.push((200 - r) + "," + y);
+                        pointsRight.unshift((200 + r) + "," + y);
                     }}
                     
-                    // Собираем точки в идеальный многоугольник SVG
-                    let d = "M 170,320 L " + points.join(" L ") + " Z";
+                    // ИДЕАЛЬНАЯ КРУГЛАЯ МАКУШКА: строим верхнюю шапку как дугу окружности
+                    let startY = 320 - (0.7 * totalH);
+                    let topY = 320 - totalH;
+                    let capH = startY - topY; // высота шапки
+                    
+                    for (let angle = 180; angle >= 0; angle -= 6) {{
+                        let rad = angle * Math.PI / 180;
+                        // Координаты идеального эллипса/окружности для верхушки
+                        let xDist = bulbR * Math.cos(rad);
+                        let yDist = capH * Math.sin(rad);
+                        
+                        let x = 200 + xDist;
+                        let y = startY - yDist;
+                        
+                        // Добавляем точки купола в центральную часть массива
+                        pointsLeft.push(x + "," + y);
+                    }}
+                    
+                    // Соединяем левую сторону, круглый купол и правую сторону
+                    let allPoints = pointsLeft.concat(pointsRight);
+                    let d = "M 170,320 L " + allPoints.join(" L ") + " Z";
                     dropPath.setAttribute('d', d);
 
                     
