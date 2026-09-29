@@ -1,4 +1,4 @@
-               import numpy as np
+import numpy as np
 
 # Довідкові дані рідин при 20°C
 LIQUIDS = {
