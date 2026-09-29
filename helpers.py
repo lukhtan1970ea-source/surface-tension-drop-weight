@@ -73,7 +73,7 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Чистый Безье)
+                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Чистый симметричный сплайн)
                     let sP = (p - 0.3) / 0.58; 
                     let totalH = 18 + (sP * 72); 
                     let topY = 320 - totalH;
@@ -86,20 +86,15 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let xLeftN = 200 - curNeck;
                     let xRightN = 200 + curNeck;
                     
-                    // Симметричные контрольные точки по Y для идеальной капли
-                    let yCtrl1 = 310;
-                    let yCtrl2 = topY + (totalH * 0.4);
+                    // Высота контрольных точек для управления "пухлостью" мешочка
+                    let yCtrlLower = 310;
+                    let yCtrlUpper = topY + (totalH * 0.2);
                     
-                    // Построение контура ТОЛЬКО через кривые Bezier (без дуг A)
-                    // От левого края (170,320) плавно вверх к макушке (200, topY) 
-                    // И затем зеркально-симметрично вниз к правому краю (230,320)
+                    // ВСЕГО ДВЕ КРИВЫЕ: одна вверх, одна вниз. Полная симметрия и плавность без изломов
                     let d = `M 170,320 
-                             C 170,${{yCtrl1}} ${{xLeftN}},300 ${{xLeftB}},${{yCtrl2}} 
-                             C ${{xLeftB}},${{topY}} 190,${{topY}} 200,${{topY}} 
-                             C 210,${{topY}} ${{xRightB}},${{topY}} ${{xRightB}},${{yCtrl2}} 
-                             C ${{xRightB}},${{yCtrl2}} ${{xRightN}},300 230,${{yCtrl1}} 230,320 Z`;
+                             C 170,${{yCtrlLower}} ${{xLeftB}},${{yCtrlUpper}} 200,${{topY}} 
+                             C ${{xRightB}},${{yCtrlUpper}} 230,${{yCtrlLower}} 230,320 Z`;
                     dropPath.setAttribute('d', d);
-
 
 
                     
