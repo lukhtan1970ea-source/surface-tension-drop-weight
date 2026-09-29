@@ -72,41 +72,36 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let d = `M 170,320 A 30,${{h}} 0 0,1 230,320 Z`;
                     dropPath.setAttribute('d', d);
                     
-                }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Физически корректное вытягивание капли (Каплеидная модель)
+                }                } else if (p <= 0.88) {{
+                    // ФАЗА 2: Вытягивание в мешочек с идеальным сглаживанием у капилляра
                     let sP = (p - 0.3) / 0.58; 
                     let totalH = 18 + (sP * 72); 
                     let topY = 320 - totalH;
                     
-                    // Расчет критического сужения шейки и расширения пуза
                     let curNeck = 30 - (30 - critNeck) * (sP * sP);
                     let bulbR = curNeck + (36 - curNeck) * Math.sin(sP * Math.PI);
                     
-                    // Координаты ключевых точек
                     let xLeftB  = 200 - bulbR;
                     let xRightB = 200 + bulbR;
                     let xLeftN  = 200 - curNeck;
                     let xRightN = 200 + curNeck;
                     
-                    // Расчет высот для контрольных точек натяжения жидкого мешка
-                    let yNeck = 320 - (totalH * 0.25); // Перетяжка шейки
-                    let yBulb = topY + (totalH * 0.4);   // Центр пузатой части
+                    // Высоты контрольных точек
+                    let yNeck = 320 - (totalH * 0.3);  // Перетяжка шейки чуть выше
+                    let yBulb = topY + (totalH * 0.4);  // Максимальное расширение
                     
-                    // Контрольные точки купола (чтобы макушка была идеально круглой, а не плоской)
+                    // Скругляющий коэффициент для макушки
                     let ctrlTopX = bulbR * 0.55; 
                     
-                    // ЕДИНЫЙ СГЛАЖЕННЫЙ ПУТЬ SVG (Без изломов, пагод и плоских крыш):
-                    // 1. От капилляра (170,320) плавно сужаемся к шейке
-                    // 2. От шейки плавно расширяемся к самому пузатому месту капли
-                    // 3. Через верхние контрольные точки закругляем идеальную сферу макушки
-                    // 4. Зеркально опускаемся обратно к правому краю капилляра (230,320)
+                    // ИСПРАВЛЕНО: Контрольные точки у основания (170,305 и 230,305) 
+                    // заставляют контур выходить из капилляра вертикально, убирая "зуб"
                     let d = `M 170,320 
-                             C 170,${{320 - totalH*0.1}} ${{xLeftN}},${{yNeck}} ${{xLeftN}},${{yNeck}} 
-                             C ${{xLeftN}},${{yNeck}} ${{xLeftB}},${{yNeck + totalH*0.2}} ${{xLeftB}},${{yBulb}} 
+                             C 170,305 ${{xLeftN}},${{yNeck}} ${{xLeftN}},${{yNeck}} 
+                             C ${{xLeftN}},${{yNeck}} ${{xLeftB}},${{yNeck + totalH*0.1}} ${{xLeftB}},${{yBulb}} 
                              C ${{xLeftB}},${{topY + totalH*0.15}} ${{200 - ctrlTopX}},${{topY}} 200,${{topY}} 
                              C ${{200 + ctrlTopX}},${{topY}} ${{xRightB}},${{topY + totalH*0.15}} ${{xRightB}},${{yBulb}} 
-                             C ${{xRightB}},${{yNeck + totalH*0.2}} ${{xRightN}},${{yNeck}} ${{xRightN}},${{yNeck}} 
-                             C ${{xRightN}},${{yNeck}} 230,${{320 - totalH*0.1}} 230,320 Z`;
+                             C ${{xRightB}},${{yNeck + totalH*0.1}} ${{xRightN}},${{yNeck}} ${{xRightN}},${{yNeck}} 
+                             C ${{xRightN}},${{yNeck}} 230,305 230,320 Z`;
                              
                     dropPath.setAttribute('d', d);
 
