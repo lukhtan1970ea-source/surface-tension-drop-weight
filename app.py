@@ -59,46 +59,6 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("🔬 Поле зрения микроскопа")
     plot_placeholder = st.empty()
-    # Первичный вывод сцены
-    fig_init = draw_scene("growing", 0.0, 0.0, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
-    plot_placeholder.plotly_chart(fig_init, use_container_width=True)
-
-with col2:
-    st.subheader("📊 Управление и Весы")
-    
-    if st.button("🚀 Запустить дозатор жидкости", use_container_width=True):
-        st.session_state.drops_counted = 0
-        
-        for d in range(target_drops):
-            # 1. Фаза роста
-            steps_growth = 20
-            for step in range(steps_growth):
-                progress = step / float(steps_growth - 1)
-                fig = draw_scene("growing", progress, 0.0, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
-                plot_placeholder.plotly_chart(fig, use_container_width=True)
-                time.sleep(0.04)
-            
-            # Небольшая пауза перед отрывом
-            time.sleep(0.2)
-            
-            # 2. Фаза падения капли в стакан
-            y_start = -4.5
-            y_end = -9.5
-            steps_fall = 6
-            for step in range(steps_fall):
-                pos_y = y_start + (y_end - y_start) * (step / float(steps_fall - 1))
-                fig = draw_scene("falling", 1.0, pos_y, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
-                plot_placeholder.plotly_chart(fig, use_container_width=True)
-                time.sleep(0.02)
-                
-            st.session_state.drops_counted += 1
-            
-        # Обновляем сцену финально
-        fig_final = draw_scene("growing", 0.0, 0.0, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
-        plot_placeholder.plotly_chart(fig_final, use_container_width=True)
-        st.balloons()
-    st.subheader("🔬 Поле зрения микроскопа")
-    plot_placeholder = st.empty()
     # Первичный вывод сцены (фиксированная ширина, статический режим)
     fig_init = draw_scene("growing", 0.0, 0.0, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
     plot_placeholder.plotly_chart(fig_init, use_container_width=False, config={'staticPlot': True})
@@ -137,6 +97,7 @@ with col2:
         fig_final = draw_scene("growing", 0.0, 0.0, sigma_true, st.session_state.drops_counted, mic_x, mic_y)
         plot_placeholder.plotly_chart(fig_final, use_container_width=False, config={'staticPlot': True})
         st.balloons()
+
 
 
     # Измерительный блок весов
