@@ -73,56 +73,41 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Вытягивание в мешочек с идеальной сферической макушкой
+                    // ФАЗА 2: Физически корректное вытягивание капли (Каплеидная модель)
                     let sP = (p - 0.3) / 0.58; 
                     let totalH = 18 + (sP * 72); 
+                    let topY = 320 - totalH;
                     
+                    // Расчет критического сужения шейки и расширения пуза
                     let curNeck = 30 - (30 - critNeck) * (sP * sP);
                     let bulbR = curNeck + (36 - curNeck) * Math.sin(sP * Math.PI);
                     
-                    let pointsLeft = [];
-                    let pointsRight = [];
-                    let steps = 30;
+                    // Координаты ключевых точек
+                    let xLeftB  = 200 - bulbR;
+                    let xRightB = 200 + bulbR;
+                    let xLeftN  = 200 - curNeck;
+                    let xRightN = 200 + curNeck;
                     
-                    // Расчет профиля до макушки (нижние 70% высоты капли)
-                    for (let i = 0; i <= steps; i++) {{
-                        let t = (i / steps) * 0.7; // только до 0.7 высоты
-                        let y = 320 - (t * totalH);
-                        
-                        let r = 0;
-                        if (t < 0.2) {{
-                            let k = t / 0.2;
-                            r = 30 - (30 - curNeck) * Math.sin(k * Math.PI / 2);
-                        }} else {{
-                            let k = (t - 0.2) / 0.5;
-                            r = curNeck + (bulbR - curNeck) * Math.sin(k * Math.PI / 2);
-                        }}
-                        
-                        pointsLeft.push((200 - r) + "," + y);
-                        pointsRight.unshift((200 + r) + "," + y);
-                    }}
+                    // Расчет высот для контрольных точек натяжения жидкого мешка
+                    let yNeck = 320 - (totalH * 0.25); // Перетяжка шейки
+                    let yBulb = topY + (totalH * 0.4);   // Центр пузатой части
                     
-                    // ИДЕАЛЬНАЯ КРУГЛАЯ МАКУШКА: строим верхнюю шапку как дугу окружности
-                    let startY = 320 - (0.7 * totalH);
-                    let topY = 320 - totalH;
-                    let capH = startY - topY; // высота шапки
+                    // Контрольные точки купола (чтобы макушка была идеально круглой, а не плоской)
+                    let ctrlTopX = bulbR * 0.55; 
                     
-                    for (let angle = 180; angle >= 0; angle -= 6) {{
-                        let rad = angle * Math.PI / 180;
-                        // Координаты идеального эллипса/окружности для верхушки
-                        let xDist = bulbR * Math.cos(rad);
-                        let yDist = capH * Math.sin(rad);
-                        
-                        let x = 200 + xDist;
-                        let y = startY - yDist;
-                        
-                        // Добавляем точки купола в центральную часть массива
-                        pointsLeft.push(x + "," + y);
-                    }}
-                    
-                    // Соединяем левую сторону, круглый купол и правую сторону
-                    let allPoints = pointsLeft.concat(pointsRight);
-                    let d = "M 170,320 L " + allPoints.join(" L ") + " Z";
+                    // ЕДИНЫЙ СГЛАЖЕННЫЙ ПУТЬ SVG (Без изломов, пагод и плоских крыш):
+                    // 1. От капилляра (170,320) плавно сужаемся к шейке
+                    // 2. От шейки плавно расширяемся к самому пузатому месту капли
+                    // 3. Через верхние контрольные точки закругляем идеальную сферу макушки
+                    // 4. Зеркально опускаемся обратно к правому краю капилляра (230,320)
+                    let d = `M 170,320 
+                             C 170,${{320 - totalH*0.1}} ${{xLeftN}},${{yNeck}} ${{xLeftN}},${{yNeck}} 
+                             C ${{xLeftN}},${{yNeck}} ${{xLeftB}},${{yNeck + totalH*0.2}} ${{xLeftB}},${{yBulb}} 
+                             C ${{xLeftB}},${{topY + totalH*0.15}} ${{200 - ctrlTopX}},${{topY}} 200,${{topY}} 
+                             C ${{200 + ctrlTopX}},${{topY}} ${{xRightB}},${{topY + totalH*0.15}} ${{xRightB}},${{yBulb}} 
+                             C ${{xRightB}},${{yNeck + totalH*0.2}} ${{xRightN}},${{yNeck}} ${{xRightN}},${{yNeck}} 
+                             C ${{xRightN}},${{yNeck}} 230,${{320 - totalH*0.1}} 230,320 Z`;
+                             
                     dropPath.setAttribute('d', d);
 
                     
