@@ -73,7 +73,7 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     dropPath.setAttribute('d', d);
                     
                 }} else if (p <= 0.88) {{
-                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки
+                    // ФАЗА 2: Вытягивание в мешочек с формированием шейки (Чистый Безье)
                     let sP = (p - 0.3) / 0.58; 
                     let totalH = 18 + (sP * 72); 
                     let topY = 320 - totalH;
@@ -86,15 +86,20 @@ def generate_microscope_svg(sigma_true, mic_x, mic_y):
                     let xLeftN = 200 - curNeck;
                     let xRightN = 200 + curNeck;
                     
-                    // Симметричные контрольные точки по Y для плавного изгиба мешочка
-                    let yCtrl = topY + (totalH * 0.3);
+                    // Симметричные контрольные точки по Y для идеальной капли
+                    let yCtrl1 = 310;
+                    let yCtrl2 = topY + (totalH * 0.4);
                     
-                    // ИСПРАВЛЕНО: флаг дуги изменен на 0,0 для идеального перевернутого купола
+                    // Построение контура ТОЛЬКО через кривые Bezier (без дуг A)
+                    // От левого края (170,320) плавно вверх к макушке (200, topY) 
+                    // И затем зеркально-симметрично вниз к правому краю (230,320)
                     let d = `M 170,320 
-                             C 170,310 ${{xLeftN}},300 ${{xLeftB}},${{yCtrl}} 
-                             A ${{bulbR}},${{bulbR * 1.1}} 0 0,0 ${{xRightB}},${{yCtrl}} 
-                             C ${{xRightN}},300 230,310 230,320 Z`;
+                             C 170,${{yCtrl1}} ${{xLeftN}},300 ${{xLeftB}},${{yCtrl2}} 
+                             C ${{xLeftB}},${{topY}} 190,${{topY}} 200,${{topY}} 
+                             C 210,${{topY}} ${{xRightB}},${{topY}} ${{xRightB}},${{yCtrl2}} 
+                             C ${{xRightB}},${{yCtrl2}} ${{xRightN}},300 230,${{yCtrl1}} 230,320 Z`;
                     dropPath.setAttribute('d', d);
+
 
 
                     
