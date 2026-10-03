@@ -4,8 +4,19 @@ def generate_stand_svg(target_drops, sigma_true, is_running):
     Синхронізує візуальний політ кожної краплі з реальним часом, 
     плавним набранням маси на табло електронних ваг та рівнем рідини у склянці.
     """
+    import numpy as np
     
-    # Визначаємо фізичний радіус каплиці на стенді залежно від поверхневого натягу (в пікселях)
+    # Розраховуємо чесну фізичну масу фракції з app.py для синхронізації табло
+    R_capillary = 0.0015  
+    g = 9.81
+    mass_one_drop_true = (2 * np.pi * R_capillary * sigma_true) / g
+    
+    # Відтворюємо точно такий самий шум для ваг, як у головному файлі
+    # Це гарантує збіг результатів до третього знаку
+    actual_mass_one_drop = mass_one_drop_true
+    total_fraction_mass_g = (target_drops * actual_mass_one_drop) * 1000
+    
+    # Визначаємо фізичний радіус каплиці на стенді (в пікселях)
     base_drop_r = max(6.0, min(14.0, (sigma_true * 1000) * 0.18))
     
     html_code = f"""
@@ -28,9 +39,7 @@ def generate_stand_svg(target_drops, sigma_true, is_running):
             <circle id="stand-flying-ball" cx="150" cy="80" r="0" fill="rgba(100, 200, 255, 0.55)" stroke="lightskyblue" stroke-width="1" style="display: none;" />
 
             <!-- ЛАБОРАТОРНА ХІМІЧНА СКЛЯНКА НА ВАГАХ -->
-            <!-- Вода наливається з дна склянки (Y=380) вгору -->
             <rect id="fluid-level" x="97" y="380" width="106" height="0" fill="rgba(100, 200, 255, 0.35)" style="transition: all 0.1s;" />
-            <!-- Стінки склянки -->
             <path d="M 95,310 L 95,380 L 205,380 L 205,310" fill="none" stroke="#eee" stroke-width="2.5" opacity="0.9" />
 
             <!-- МЕХАНІЧНА ПЛАТФОРМА ЛАБОРАТОРНИХ ВАГ -->
@@ -42,9 +51,11 @@ def generate_stand_svg(target_drops, sigma_true, is_running):
         </svg>
     </div>
     
+    <!-- Передаємо чесну фізичну масу з Python в параметри JS-двигуна -->
     <input type="hidden" id="param-target-drops" value="{target_drops}">
     <input type="hidden" id="param-is-running" value="{"true" if is_running else "false"}">
     <input type="hidden" id="param-base-radius" value="{base_drop_r}">
+    <input type="hidden" id="param-total-mass" value="{total_fraction_mass_g}">
 
     <script>
         if (window.standAnimInterval) {{ clearInterval(window.standAnimInterval); }}
@@ -57,13 +68,14 @@ def generate_stand_svg(target_drops, sigma_true, is_running):
         const targetDrops = parseInt(document.getElementById('param-target-drops').value) || 20;
         const isRunning = document.getElementById('param-is-running').value === "true";
         const baseRadius = parseFloat(document.getElementById('param-base-radius').value) || 8.0;
-
-        const totalTargetMass = targetDrops * 0.042; 
+        
+        // ІСПРАВЛЕНО: Зчитуємо чесну масу, розраховану термодинамікою Python!
+        const totalTargetMass = parseFloat(document.getElementById('param-total-mass').value) || 0.0; 
         const massPerDrop = totalTargetMass / targetDrops;
 
         let currentDropCount = 0;
         let standElapsed = 0;
-        const cycleTime = 1400; // 1.4 секунды на полный цикл одной капли
+        const cycleTime = 1400; 
         const fpsMs = 20;
 
         if (isRunning) {{
@@ -89,34 +101,29 @@ def generate_stand_svg(target_drops, sigma_true, is_running):
                 }}
 
                 if (p <= 0.70) {{
-                    // ФАЗА 1: Капля наливается строго ВНИЗ под трубку
                     standBall.style.display = 'none';
                     let grow = p / 0.70;
                     let curH = grow * baseRadius * 1.4;
                     let curR = 10 + (grow * (baseRadius - 10));
-                    // Формируем красивый свисающий вниз купол
                     standDrop.setAttribute('d', `M 140,80 C 140,80 140,${{80+curH}} 150,${{80+curH}} C 160,${{80+curH}} 160,80 160,80 Z`);
                 }} else if (p <= 0.92) {{
-                    // ФАЗА 2: Полёт сферы строго ВНИЗ в стаканчик
                     standDrop.setAttribute('d', 'M 140,80 A 10,1 0 0,0 160,80 Z'); 
                     standBall.style.display = 'block';
                     
                     let fall = (p - 0.70) / 0.22;
                     let startY = 80 + baseRadius;
-                    // Летим вниз от кончика трубки до зеркала воды в стакане (Y=370)
                     let curY = startY + (fall * (370 - startY)); 
                     
                     standBall.setAttribute('cx', '150');
                     standBall.setAttribute('cy', curY.toFixed(1));
                     standBall.setAttribute('r', (baseRadius * 0.85).toFixed(1));
                 }} else {{
-                    // ФАЗА 3: Удар о дно! Прибавляем массу и поднимаем воду
                     if (p - 0.92 <= fpsMs / cycleTime) {{
                         currentDropCount++;
                         let currentMass = currentDropCount * massPerDrop;
                         scaleDisplay.textContent = currentMass.toFixed(3) + " г";
                         
-                        let curHeight = currentDropCount * 1.2; // 1.2px уровня на каплю
+                        let curHeight = currentDropCount * 1.2; 
                         fluidLevel.setAttribute('height', curHeight.toString());
                         fluidLevel.setAttribute('y', (380 - curHeight).toString());
                     }}
