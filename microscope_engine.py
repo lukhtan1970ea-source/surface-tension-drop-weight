@@ -1,28 +1,32 @@
 def generate_microscope_svg(sigma_true, rho_true, mic_x=0.0, mic_y=0.0):
     """
-    Високоточний JS/SVG рушій каплеїди з прямим підключенням до слайдерів Streamlit.
+    Високоточний JS/SVG рушій каплеїди з жорсткою синхронізацією шкали через Python.
     """
-    # Перерахунок міліметрів у масштабні пікселі (1 мм = 40 пікселів)
+    # 1. Точный метрологический пересчет: 1 мм = 40 пикселей (цена деления 0.1 мм = 4px)
     svg_mic_x = 200 + (mic_x * 40)
     svg_mic_y = 200 - (mic_y * 40)
 
-    # Генеруємо трьохступеневу ГОСТ-шкалу з кроком 4 пікселі (0.1 мм)
+    # 2. Генерация трехступенчатой ГОСТ-шкалы силами Python
     ticks_html = ""
     for i in range(-160, 181, 4):
-        tick_index = i / 4
+        tick_index = i // 4
         t_len = 5
         stroke_w = 0.7
-        if tick_index % 10 === 0:
-            t_len = 14
+        
+        if tick_index % 10 == 0:
+            t_len = 14          # Каждые 1.0 мм — длинный штрих
             stroke_w = 1.3
-        elif tick_index % 5 === 0:
-            t_len = 9
+        elif tick_index % 5 == 0:
+            t_len = 9           # Каждые 0.5 мм — средний штрих
             stroke_w = 1.0
+            
         ticks_html += f'<line x1="{svg_mic_x + i}" y1="{svg_mic_y - t_len}" x2="{svg_mic_x + i}" y2="{svg_mic_y + t_len}" stroke="rgba(255,0,0,0.85)" stroke-width="{stroke_w}" />'
 
+    # 3. Чистый HTML/SVG контейнер со встроенным изолированным JS-таймером капли
     svg_html = f"""
     <div style="background: #161616; padding: 20px; border-radius: 16px; width: 420px; margin: 0 auto; box-shadow: 0 8px 32px rgba(0,0,0,0.6); border: 1px solid #333; text-align: center;">
         <svg id="drop-container" width="400" height="400" viewBox="0 0 400 400" style="background: #010401; border: 4px solid #555; border-radius: 50%;">
+            
             <!-- Скляний капіляр знизу -->
             <rect x="162" y="340" width="76" height="60" fill="#333" opacity="0.85" />
             <rect x="165" y="340" width="70" height="60" fill="#010401" />
@@ -32,7 +36,7 @@ def generate_microscope_svg(sigma_true, rho_true, mic_x=0.0, mic_y=0.0):
             <path id="fluid-drop" d="" fill="rgba(100, 210, 255, 0.43)" stroke="lightskyblue" stroke-width="2.3" stroke-linejoin="round" />
             <circle id="flying-ball" cx="200" cy="500" r="0" fill="rgba(100, 210, 255, 0.55)" stroke="lightskyblue" stroke-width="2" style="display: none;" />
 
-            <!-- РУХОМА ВИМІРЮВАЛЬНА ШКАЛА (Зв'язана з Python) -->
+            <!-- РУХОМА ВИМІРЮВАЛЬНА ШКАЛА (Привязывается к ползункам Python напрямую) -->
             <g id="microscope-grid">
                 <line x1="0" y1="{svg_mic_y}" x2="400" y2="{svg_mic_y}" stroke="rgba(255,0,0,0.85)" stroke-width="1.5" />
                 <line x1="{svg_mic_x}" y1="0" x2="{svg_mic_x}" y2="400" stroke="rgba(255,0,0,0.85)" stroke-width="1.5" />
@@ -42,6 +46,7 @@ def generate_microscope_svg(sigma_true, rho_true, mic_x=0.0, mic_y=0.0):
     </div>
 
     <script>
+        // Защита от накопления фоновых процессов
         if (window.dropAnimInterval) {{ clearInterval(window.dropAnimInterval); }}
         
         const pathDrop = document.getElementById('fluid-drop');
