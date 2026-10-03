@@ -43,11 +43,11 @@ actual_mass_one_drop = max(1e-6, mass_one_drop_true + np.random.normal(0, mass_o
 ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([1.5, 1.5, 1.0])
 
 with ctrl_col1:
-    if st.button("🚀 Відкрити затвор дозатора рідини", use_container_width=True):
+    if st.button("💧 Відкрити затвор дозатора рідини", use_container_width=True):
         st.session_state.experiment_triggered = True
 
 with ctrl_col2:
-    if st.button("🔄 Перезавантажити стенд", use_container_width=True):
+    if st.button("🛑 Перекрити кран", use_container_width=True):
         reset_stand_state()
         st.rerun()
 
@@ -70,19 +70,15 @@ with tab1:
     
     with col_mic_right:
         st.markdown("### 🎛️ Налаштування візира мікроскопа")
-        # ВОЗВРАЩАЕМ РОДНЫЕ СЛАЙДЕРЫ STREAMLIT
-        mic_x = st.slider("Зсув шкали по горизонталі X (мм)", -2.0, 2.0, 0.0, 0.01)
-        mic_y = st.slider("Зсув шкали по вертикалі Y (мм)", -4.0, 4.0, 0.0, 0.01)
-        st.info("🔬 **Порада для студентів:** Сумістіть вертикальну лінію червоної шкали з бічною межею шийки краплі перед самим її відривом за допомогою гвинтів тонкої наводки.")
+        st.info("🔬 **Порада для студентів:** Обертайте гвинти тонкої наводки безпосередньо під вікном окуляра мікроскопа, щоб плавно сумістити червону сітку з бічною межею шийки краплі перед самим її відривом.")
+        st.info("Ціна кожної маленької поділки шкали становить строго **0.1 мм**.")
         
     with col_mic_left:
         if st.session_state.experiment_triggered:
-            # ПЕРЕДАЕМ НАСТРОЙКИ ШКАЛЫ НАПРЯМУЮ В ФУНКЦИЮ
-            mic_svg = generate_microscope_svg(sigma_true, rho_true, mic_x, mic_y)
-            # Возвращаем компактную высоту 440px, так как ручки снизу ушли!
-            st.components.v1.html(mic_svg, height=440, scrolling=False)
+            mic_svg = generate_microscope_svg(sigma_true, rho_true)
+            st.components.v1.html(mic_svg, height=570, scrolling=False)
         else:
-            st.info("💡 Відкрийте затвор дозатора рідини, щоб спостерігати капілярну грушу в окулярі мікроскопа.")
+            st.info("💡 Відкрийте затвор дозатора рідини вище, щоб спостерігати капілярну грушу в окулярі мікроскопа.")
 
 with tab2:
     col_st_left, col_st_right = st.columns([1.0, 1.2])
