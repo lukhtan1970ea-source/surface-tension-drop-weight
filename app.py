@@ -4,6 +4,7 @@ from physics import LIQUIDS, get_physical_properties
 from microscope_engine import generate_microscope_svg
 from helpers import generate_stand_svg
 
+# Базове налаштування сторінки
 st.set_page_config(page_title="Stalagmometer Pro Sim", layout="wide")
 
 # ==========================================
@@ -41,14 +42,19 @@ if selected_liquid != st.session_state.last_liquid or temperature != st.session_
     st.session_state.last_temp = temperature
     reset_stand_state()
 
-# Розрахунок фізики
+# Розрахунок чесної фізики речовини
 sigma_true, rho_true = get_physical_properties(selected_liquid, temperature)
 R_capillary = 0.0015  
 g = 9.81
 mass_one_drop_true = (2 * np.pi * R_capillary * sigma_true) / g
 
+# Легкий лабораторний шум додається ТІЛЬКИ до ваги самої рідини
 np.random.seed(int(temperature * 10))
 actual_mass_one_drop = max(1e-6, mass_one_drop_true + np.random.normal(0, mass_one_drop_true * 0.003))
+
+# Повна чесна маса рідини (рахується завжди для передачі в JS)
+total_drops_mass_g = (target_drops * actual_mass_one_drop) * 1000 
+current_weight = st.session_state.tare_weight + total_drops_mass_g
 
 # ==========================================
 # 3. ВЕРХНЯ ПАНЕЛЬ УПРАВЛІННЯ
@@ -61,10 +67,9 @@ with ctrl_col1:
         st.session_state.experiment_finished = False
 
 with ctrl_col2:
-    if st.button("🛑 Перекрити кран / Зняти показання", use_container_width=True):
-        if st.session_state.experiment_triggered:
-            st.session_state.experiment_finished = True
-            st.session_state.experiment_triggered = False
+    if st.button("🔄 Перезавантажити стенд", use_container_width=True):
+        reset_stand_state()
+        st.rerun()
 
 with ctrl_col3:
     if st.session_state.experiment_triggered:
@@ -75,10 +80,6 @@ with ctrl_col3:
         st.warning("Дозатор перекрито")
 
 st.markdown(" ")
-
-# Розрахунок повної маси
-total_drops_mass_g = (target_drops * actual_mass_one_drop) * 1000 
-current_weight = st.session_state.tare_weight + total_drops_mass_g
 
 # ==========================================
 # 4. ГОЛОВНІ ВКЛАДКИ
@@ -108,7 +109,13 @@ with tab2:
         w_col1, w_col2 = st.columns(2)
         w_col1.metric(label="Маса сухої склянки ($m_0$)", value=f"{st.session_state.tare_weight:.3f} г")
         
-        # ІСПРАВЛЕНО: Маса m1 відкривається строго після того, як студент натисне "Перекрити кран"
+        # Кнопка для фіксації результату студентом
+        if st.session_state.experiment_triggered:
+            if st.button("⚖️ Зняти показання з ваг", use_container_width=True):
+                st.session_state.experiment_finished = True
+                st.session_state.experiment_triggered = False
+                st.rerun()
+
         if st.session_state.experiment_finished:
             w_col2.metric(label="Маса склянки з рідиною ($m_1$)", value=f"{current_weight:.3f} г")
         elif st.session_state.experiment_triggered:
@@ -117,7 +124,15 @@ with tab2:
             w_col2.metric(label="Маса склянки з рідиною ($m_1$)", value="--- г")
             
     with col_st_left:
-        stand_svg = generate_stand_svg(target_drops, sigma_true, st.session_state.experiment_triggered, st.session_state.tare_weight, total_drops_mass_g)
+        # ПЕРЕДАЄМО ДВА ФЛАГИ: experiment_triggered ТА experiment_finished ДЛЯ ТОЧНОГО СТАНУ JS
+        stand_svg = generate_stand_svg(
+            target_drops, 
+            sigma_true, 
+            st.session_state.experiment_triggered, 
+            st.session_state.experiment_finished,
+            st.session_state.tare_weight, 
+            total_drops_mass_g
+        )
         st.components.v1.html(stand_svg, height=480, scrolling=False)
 
 # ==========================================
@@ -126,7 +141,6 @@ with tab2:
 st.markdown("---")
 st.subheader("📋 Журнал вимірювань (Вихідні дані для звіту)")
 
-# ІСПРАВЛЕНО: Прибрали різницю мас, нехай рахують самі!
 results_data = {
     "Параметр вимірювання": [
         "Досліджувана робоча рідина",
