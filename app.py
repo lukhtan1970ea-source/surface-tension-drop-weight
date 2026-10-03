@@ -4,8 +4,12 @@ from physics import LIQUIDS, get_physical_properties
 from microscope_engine import generate_microscope_svg
 from helpers import generate_stand_svg
 
+# Базове налаштування сторінки
 st.set_page_config(page_title="Stalagmometer Pro Sim", layout="wide")
 
+# ==========================================
+# 1. ІНІЦІАЛІЗАЦІЯ ТА СКИДАННЯ СТАНУ
+# ==========================================
 if "tare_weight" not in st.session_state:
     st.session_state.tare_weight = round(25.123 + np.random.uniform(-0.5, 0.5), 3)
 if "experiment_triggered" not in st.session_state:
@@ -15,6 +19,9 @@ if "last_liquid" not in st.session_state:
 if "last_temp" not in st.session_state:
     st.session_state.last_temp = 20.0
 
+# ==========================================
+# 2. БОКОВА ПАНЕЛЬ КЕРУВАННЯ
+# ==========================================
 st.title("🔬 Лабораторна робота: Визначення коефіцієнта поверхневого натягу методом зважування крапель")
 st.markdown("---")
 
@@ -27,19 +34,25 @@ def reset_stand_state():
     st.session_state.experiment_triggered = False
     st.session_state.tare_weight = round(25.123 + np.random.uniform(-0.5, 0.5), 3)
 
+# Автоматичний скид при зміні рідини або температури
 if selected_liquid != st.session_state.last_liquid or temperature != st.session_state.last_temp:
     st.session_state.last_liquid = selected_liquid
     st.session_state.last_temp = temperature
     reset_stand_state()
 
+# Розрахунок фізики
 sigma_true, rho_true = get_physical_properties(selected_liquid, temperature)
 R_capillary = 0.0015  
 g = 9.81
 mass_one_drop_true = (2 * np.pi * R_capillary * sigma_true) / g
 
-np.random.seed(int(temperature * 7))
+# Додавання індивідуального шуму для ваг
+np.random.seed(int(sigma_true * 10000))
 actual_mass_one_drop = max(1e-6, mass_one_drop_true + np.random.normal(0, mass_one_drop_true * 0.005))
 
+# ==========================================
+# 3. ВЕРХНЯ ПАНЕЛЬ УПРАВЛІННЯ
+# ==========================================
 ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([1.5, 1.5, 1.0])
 
 with ctrl_col1:
@@ -47,7 +60,7 @@ with ctrl_col1:
         st.session_state.experiment_triggered = True
 
 with ctrl_col2:
-    if st.button("🛑 Перекрити кран", use_container_width=True):
+    if st.button("🛑 Перекрити кран / Перезавантажити", use_container_width=True):
         reset_stand_state()
         st.rerun()
 
@@ -57,12 +70,15 @@ current_weight = st.session_state.tare_weight + total_drops_mass_g
 
 with ctrl_col3:
     if st.session_state.experiment_triggered:
-        st.success(f"Крапель: {display_drops} шт.")
+        st.success(f"Ціль досліду: {target_drops} шт.")
     else:
-        st.warning("Дозатор зупинено")
+        st.warning("Дозатор перекрито")
 
 st.markdown(" ")
 
+# ==========================================
+# 4. ГОЛОВНІ ВКЛАДКИ
+# ==========================================
 tab1, tab2 = st.tabs(["🔍 Окуляр мікроскопа (Вимірювання шийки)", "⚖️ Лабораторний стенд (Зважування крапель)"])
 
 with tab1:
@@ -85,15 +101,26 @@ with tab2:
     
     with col_st_right:
         st.markdown("### ⚖️ Показання електронних ваг")
+        
         w_col1, w_col2 = st.columns(2)
         w_col1.metric(label="Маса сухої склянки ($m_0$)", value=f"{st.session_state.tare_weight:.3f} г")
-        w_col2.metric(label="Маса склянки з рідиною ($m_1$)", value=f"{current_weight:.3f} г")
-        st.info(f"**Маса чистої фракції крапель (Δm):** {max(0.0, current_weight - st.session_state.tare_weight):.3f} г")
+        
+        # ІСПРАВЛЕНО: Фінальна маса m1 та Δm фіксуються у звіті тільки після запуску дозатора
+        if st.session_state.experiment_triggered:
+            w_col2.metric(label="Маса склянки з рідиною ($m_1$)", value=f"{current_weight:.3f} г")
+            st.info(f"**Маса чистої фракції крапель (Δm):** {current_weight - st.session_state.tare_weight:.3f} г")
+        else:
+            w_col2.metric(label="Маса склянки з рідиною ($m_1$)", value="--- г")
+            st.info("**Маса чистої фракції крапель (Δm):** Очікування запуску...")
             
     with col_st_left:
-        stand_svg = generate_stand_svg(target_drops, sigma_true, st.session_state.experiment_triggered)
+        # ІСПРАВЛЕНО: Передаємо m0 в генератор стенду для стартового балансу ваг
+        stand_svg = generate_stand_svg(target_drops, sigma_true, st.session_state.experiment_triggered, st.session_state.tare_weight)
         st.components.v1.html(stand_svg, height=480, scrolling=False)
 
+# ==========================================
+# 5. СУКУПНИЙ ЖУРНАЛ ВИМІРЮВАНЬ
+# ==========================================
 st.markdown("---")
 st.subheader("📋 Журнал вимірювань (Вихідні дані для звіту)")
 
@@ -109,10 +136,10 @@ results_data = {
     "Значення": [
         selected_liquid,
         f"{temperature} °C",
-        f"{display_drops} шт.",
+        f"{target_drops} шт." if st.session_state.experiment_triggered else "0 шт.",
         f"{st.session_state.tare_weight:.3f} г",
-        f"{current_weight:.3f} г",
-        f"{(current_weight - st.session_state.tare_weight):.3f} г"
+        f"{current_weight:.3f} г" if st.session_state.experiment_triggered else "--- г",
+        f"{(current_weight - st.session_state.tare_weight):.3f} г" if st.session_state.experiment_triggered else "--- г"
     ]
 }
 st.table(results_data)
