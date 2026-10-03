@@ -5,7 +5,6 @@ def generate_microscope_svg(sigma_true, rho_true, old_mic_x=0.0, old_mic_y=0.0):
     що повністю усуває трясіння графіка, зависання та злами контуру каплиці.
     """
     
-    # Наш виверений монолітний HTML/JS/SVG блок приладу
     svg_html = """
     <div style="background: #161616; padding: 20px; border-radius: 16px; width: 420px; margin: 0 auto; box-shadow: 0 8px 32px rgba(0,0,0,0.6); border: 1px solid #333; text-align: center;">
         
@@ -44,7 +43,9 @@ def generate_microscope_svg(sigma_true, rho_true, old_mic_x=0.0, old_mic_y=0.0):
         </div>
     </div>
     <script>
-        if (window.animFrameId) { cancelAnimationFrame(window.animFrameId); }
+        // Полная очистка предыдущих таймеров при обновлении страницы
+        if (window.dropAnimInterval) { clearInterval(window.dropAnimInterval); }
+        
         const pathDrop = document.getElementById('fluid-drop');
         const ballFly = document.getElementById('flying-ball');
         const lineX = document.getElementById('grid-line-x');
@@ -55,6 +56,7 @@ def generate_microscope_svg(sigma_true, rho_true, old_mic_x=0.0, old_mic_y=0.0):
         const valX = document.getElementById('val-x');
         const valY = document.getElementById('val-y');
 
+        // ТРИСТУПЕНЕВА ГОСТ ШКАЛА: 1 мм = 40 пікселів, крок риски 4px = 0.1 мм
         function updateMicroscopeGrid() {
             let x_mm = parseFloat(sliderX.value);
             let y_mm = parseFloat(sliderY.value);
@@ -117,17 +119,20 @@ def generate_microscope_svg(sigma_true, rho_true, old_mic_x=0.0, old_mic_y=0.0):
             return {d: dPath, h: totalH, r: maxBulbR};
         }
 
-        let startTime = null; const loopDuration = 4800; 
-        
-        function animationFrame(timestamp) {
+        const loopDuration = 4800; 
+        let currentElapsed = 0;
+        const frameRateMs = 20; // 50 кадров в секунду для идеальной плавности
+
+        // ЖЕЛЕЗОБЕТОННЫЙ ТАЙМЕР ДЛЯ СТАБИЛЬНОГО СТАРТА ВНУТРИ СТРИМЛИТ-ВКЛАДОК
+        window.dropAnimInterval = setInterval(() => {
+            // Если вкладку скрыли или дозатор закрыли — гасим таймер, чтобы не грузить память
             if (!document.getElementById('drop-container')) {
-                if (window.animFrameId) { cancelAnimationFrame(window.animFrameId); }
+                clearInterval(window.dropAnimInterval);
                 return;
             }
 
-            if (!startTime) startTime = timestamp;
-            let elapsed = timestamp - startTime;
-            let p = (elapsed % loopDuration) / loopDuration;
+            currentElapsed += frameRateMs;
+            let p = (currentElapsed % loopDuration) / loopDuration;
 
             if (p <= 0.82) {
                 ballFly.style.display = 'none'; pathDrop.style.display = 'block';
@@ -169,9 +174,7 @@ def generate_microscope_svg(sigma_true, rho_true, old_mic_x=0.0, old_mic_y=0.0):
             } else {
                 ballFly.style.display = 'none';
             }
-            window.animFrameId = requestAnimationFrame(animationFrame);
-        }
-        window.animFrameId = requestAnimationFrame(animationFrame);
+        }, frameRateMs);
     </script>
     """
     return svg_html
