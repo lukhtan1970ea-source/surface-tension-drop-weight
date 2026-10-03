@@ -161,20 +161,18 @@ with tab2:
 st.markdown("---")
 st.subheader("📋 Журнал вимірювань (Вихідні дані для звіту)")
 
+# ІСПРАВЛЕНО: Повністю прибрали m0 та m1, тепер студенти знімають масу очима з табло ваг!
 results_data = {
     "Параметр вимірювання": [
         "Досліджувана робоча рідина",
         "Встановлена температура досліду (T)",
-        "Лічильник скинутих крапель (N)",
-        "Маса порожньої склянки (m₀)",
-        "Маса склянки з краплями (m₁)"
+        "Лічильник скинутих крапель (N)"
     ],
     "Значення": [
         selected_liquid,
         f"{temperature} °C",
-        f"{target_drops} шт." if st.session_state.experiment_finished else "0 шт.",
-        f"{st.session_state.tare_weight:.3f} г",
-        f"{current_weight:.3f} г" if st.session_state.experiment_finished else ("Вимірювання..." if st.session_state.experiment_triggered else "--- г")
+        f"{target_drops} шт." if st.session_state.experiment_finished else "0 шт."
     ]
 }
 st.table(results_data)
+
