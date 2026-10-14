@@ -50,7 +50,7 @@ if selected_liquid != st.session_state.last_liquid or temperature != st.session_
 sigma_true, rho_true = get_physical_properties(selected_liquid, temperature)
 R_capillary = 0.0015  
 g = 9.81
-mass_one_drop_true = (1.22 * np.pi * R_capillary * sigma_true) / g
+mass_one_drop_true = (1.1 * np.pi * R_capillary * sigma_true) / g
 
 # Легкий лабораторний шум додається ТІЛЬКИ до ваги самої рідини
 np.random.seed(int(temperature * 10))
